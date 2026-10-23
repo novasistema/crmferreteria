@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "NovaSystemData": {
+      "title": "NovaSystemData",
+      "description": "Stores state and sync documents for Nova Systems ERP",
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "description": "Serialized data object payload"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/nova_system_data/{dataId}": {
+      "schema": "NovaSystemData",
+      "description": "Collection storing business system states and local backups"
+    }
+  }
+}
