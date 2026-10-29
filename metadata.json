@@ -1,6 +1,8 @@
 {
-  "name": "Nova Systems - ERP Ferretería",
-  "description": "Web oficial y portal integral para Ferretería Bruzzone con acceso para Personal ERP, Portal de Autogestión de Cuentas Corrientes y Club de Puntos de Fidelización.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "Remix CRM ferreteria 2",
+  "description": "Sistema de gestión integral para fábrica de pinturas Colorear: producción, fórmulas, inventario en tiempo real, ventas ARCA/no-ARCA, portal de clientes, transporte y finanzas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Nova Systems ERP rules - allow authenticated and local business access
+    // Allow read, write to all collections for ERP operations
     match /{document=**} {
       allow read, write: if true;
     }

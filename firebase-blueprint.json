@@ -1,25 +1,413 @@
 {
   "entities": {
-    "NovaSystemData": {
-      "title": "NovaSystemData",
-      "description": "Stores state and sync documents for Nova Systems ERP",
+    "RawMaterial": {
+      "title": "Raw Material",
+      "description": "Chemicals, resins, pigments, fillers and packaging containers for paint manufacturing",
       "type": "object",
       "properties": {
-        "data": {
-          "type": "object",
-          "description": "Serialized data object payload"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "ISO timestamp of last update"
-        }
-      }
+        "id": { "type": "string" },
+        "code": { "type": "string", "maxLength": 50 },
+        "name": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "enum": ["resina", "pigmento", "carga", "aditivo", "solvente", "envase", "otro"] },
+        "unit": { "type": "string", "enum": ["kg", "litro", "unidad"] },
+        "currentStock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "unitCost": { "type": "number" },
+        "supplierId": { "type": "string", "maxLength": 100 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "code", "name", "category", "unit", "currentStock", "unitCost"]
+    },
+    "Formula": {
+      "title": "Paint Formula",
+      "description": "Standardized recipe for 100 units of finished paint product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string", "maxLength": 50 },
+        "name": { "type": "string", "maxLength": 150 },
+        "paintType": { "type": "string", "maxLength": 100 },
+        "density": { "type": "number" },
+        "theoreticalCostPerKg": { "type": "number" },
+        "baseQuantity": { "type": "number" },
+        "items": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "code", "name", "baseQuantity"]
+    },
+    "ProductionOrder": {
+      "title": "Production Order",
+      "description": "Manufacturing work order with raw material consumption and finished batch packaging",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string", "maxLength": 50 },
+        "formulaId": { "type": "string", "maxLength": 100 },
+        "productName": { "type": "string", "maxLength": 150 },
+        "batchNumber": { "type": "string", "maxLength": 50 },
+        "targetKg": { "type": "number" },
+        "packagingType": { "type": "string", "enum": ["balde_20l", "lata_10l", "lata_4l", "lata_1l", "tambor_200l"] },
+        "packageCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["planificada", "en_proceso", "control_calidad", "completada", "cancelada"] },
+        "materialCost": { "type": "number" },
+        "operatorName": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" },
+        "completedAt": { "type": "string" }
+      },
+      "required": ["id", "orderNumber", "formulaId", "targetKg", "packagingType", "status"]
+    },
+    "Product": {
+      "title": "Finished Product",
+      "description": "Finished paint products ready for sale in various packaging presentations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string", "maxLength": 50 },
+        "name": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 100 },
+        "presentation": { "type": "string", "maxLength": 50 },
+        "volumeOrWeight": { "type": "string", "maxLength": 50 },
+        "color": { "type": "string", "maxLength": 80 },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "priceWholesale": { "type": "number" },
+        "priceRetail": { "type": "number" },
+        "priceDistributor": { "type": "number" },
+        "unitCost": { "type": "number" }
+      },
+      "required": ["id", "code", "name", "stock", "priceWholesale"]
+    },
+    "InventoryMovement": {
+      "title": "Inventory Movement",
+      "description": "Audit log of raw material or finished product entries, exits, and adjustments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemType": { "type": "string", "enum": ["raw_material", "product"] },
+        "itemId": { "type": "string", "maxLength": 100 },
+        "itemName": { "type": "string", "maxLength": 150 },
+        "movementType": { "type": "string", "enum": ["entrada_produccion", "salida_produccion", "entrada_compra", "salida_venta", "ajuste_manual"] },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 20 },
+        "reference": { "type": "string", "maxLength": 150 },
+        "user": { "type": "string", "maxLength": 100 },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "itemType", "itemId", "movementType", "quantity", "date"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Distributor, paint store, contractor or retail client with tax ID and checking account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "taxId": { "type": "string", "maxLength": 20, "description": "DNI or CUIT for customer portal access" },
+        "businessName": { "type": "string", "maxLength": 150 },
+        "tradeName": { "type": "string", "maxLength": 150 },
+        "taxCategory": { "type": "string", "enum": ["responsable_inscripto", "monotributo", "consumidor_final", "exento"] },
+        "email": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "address": { "type": "string", "maxLength": 200 },
+        "city": { "type": "string", "maxLength": 100 },
+        "province": { "type": "string", "maxLength": 100 },
+        "transportId": { "type": "string", "maxLength": 100 },
+        "priceList": { "type": "string", "enum": ["mayorista", "minorista", "distribuidor"] },
+        "creditLimit": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "status": { "type": "string", "enum": ["activo", "suspendido", "bloqueado"] }
+      },
+      "required": ["id", "taxId", "businessName", "priceList"]
+    },
+    "SalesOrder": {
+      "title": "Sales Order",
+      "description": "Commercial order lifecycle through quote, picking, invoice, and dispatch",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string", "maxLength": 50 },
+        "customerId": { "type": "string", "maxLength": 100 },
+        "customerName": { "type": "string", "maxLength": 150 },
+        "customerTaxId": { "type": "string", "maxLength": 20 },
+        "billingType": { "type": "string", "enum": ["arca", "no_arca"] },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["ingresado", "preparando_remito", "facturado", "despachado", "entregado", "cancelado"] },
+        "paymentStatus": { "type": "string", "enum": ["pendiente", "parcial", "pagado"] },
+        "transportId": { "type": "string", "maxLength": 100 },
+        "transportName": { "type": "string", "maxLength": 100 },
+        "trackingCode": { "type": "string", "maxLength": 80 },
+        "remitoNumber": { "type": "string", "maxLength": 50 },
+        "invoiceNumber": { "type": "string", "maxLength": 50 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "total": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "orderNumber", "customerId", "billingType", "status", "total"]
+    },
+    "Invoice": {
+      "title": "Invoice / Bill",
+      "description": "Official ARCA electronic invoice or internal non-ARCA sales voucher",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string", "maxLength": 50 },
+        "orderId": { "type": "string", "maxLength": 100 },
+        "customerId": { "type": "string", "maxLength": 100 },
+        "customerTaxId": { "type": "string", "maxLength": 20 },
+        "customerName": { "type": "string", "maxLength": 150 },
+        "type": { "type": "string", "enum": ["FACTURA_A", "FACTURA_B", "FACTURA_C", "RECIBO_X_NO_ARCA"] },
+        "cae": { "type": "string", "maxLength": 30 },
+        "caeVto": { "type": "string", "maxLength": 20 },
+        "issueDate": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["emitida", "anulada", "pagada"] }
+      },
+      "required": ["id", "invoiceNumber", "customerId", "type", "total", "status"]
+    },
+    "Transport": {
+      "title": "Logistics Carrier",
+      "description": "Logistics transport company or internal truck fleet for paint distribution",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 120 },
+        "contactName": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "serviceArea": { "type": "string", "maxLength": 200 },
+        "vehicleType": { "type": "string", "maxLength": 100 },
+        "capacityKg": { "type": "number" },
+        "address": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["id", "name"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Chemical and packaging raw materials vendors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessName": { "type": "string", "maxLength": 150 },
+        "taxId": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "category": { "type": "string", "maxLength": 100 },
+        "paymentTerms": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["id", "businessName", "taxId"]
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order",
+      "description": "Procurement orders for paint manufacturing ingredients and packaging",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string", "maxLength": 50 },
+        "supplierId": { "type": "string", "maxLength": 100 },
+        "supplierName": { "type": "string", "maxLength": 150 },
+        "date": { "type": "string" },
+        "items": { "type": "array" },
+        "status": { "type": "string", "enum": ["solicitado", "aprobado", "recibido", "cancelado"] },
+        "total": { "type": "number" }
+      },
+      "required": ["id", "orderNumber", "supplierId", "status", "total"]
+    },
+    "FinancialTransaction": {
+      "title": "Financial Transaction",
+      "description": "Daily cash flow entries, accounts receivable collections, and supplier payments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["cobro_cliente", "pago_proveedor", "gasto_operativo", "sueldos", "mantenimiento"] },
+        "direction": { "type": "string", "enum": ["ingreso", "egreso"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "entityId": { "type": "string", "maxLength": 100 },
+        "entityName": { "type": "string", "maxLength": 150 },
+        "paymentMethod": { "type": "string", "enum": ["efectivo", "transferencia", "cheque", "echeq"] },
+        "concept": { "type": "string", "maxLength": 200 },
+        "receiptNumber": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "type", "direction", "amount", "date", "paymentMethod"]
+    },
+    "Notification": {
+      "title": "System Notification",
+      "description": "Automatic operational alerts for pending customer payments, order readiness, dispatch progress, production milestones",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "maxLength": 150 },
+        "message": { "type": "string", "maxLength": 350 },
+        "type": { "type": "string", "enum": ["pago_pendiente", "pedido_listo", "produccion_progreso", "despacho_en_camino", "stock_bajo"] },
+        "targetEntityId": { "type": "string", "maxLength": 100 },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "actionUrl": { "type": "string", "maxLength": 150 }
+      },
+      "required": ["id", "title", "message", "type", "isRead", "createdAt"]
+    },
+    "CompanyConfig": {
+      "title": "Company Configuration",
+      "description": "Paint factory corporate information, ARCA tax configuration, sales point, contact and message templates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyName": { "type": "string", "maxLength": 150 },
+        "tradeName": { "type": "string", "maxLength": 150 },
+        "cuit": { "type": "string", "maxLength": 20 },
+        "arcaPointOfSale": { "type": "number" },
+        "arcaEnvironment": { "type": "string", "enum": ["homologacion", "produccion"] },
+        "grossIncomeNumber": { "type": "string", "maxLength": 50 },
+        "activityStartDate": { "type": "string", "maxLength": 30 },
+        "fiscalAddress": { "type": "string", "maxLength": 200 },
+        "plantAddress": { "type": "string", "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "whatsappNumber": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 100 },
+        "notificationWhatsappTemplate": { "type": "string", "maxLength": 500 },
+        "paymentReminderTemplate": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "companyName", "cuit"]
+    },
+    "Seller": {
+      "title": "Street Sales Rep",
+      "description": "Street sales representatives and commercial field preventistas with sales and collection commission rates and RBAC module visibility",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "code": { "type": "string", "maxLength": 20 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 100 },
+        "zone": { "type": "string", "maxLength": 100 },
+        "dniOrTaxId": { "type": "string", "maxLength": 30 },
+        "salesCommissionPct": { "type": "number" },
+        "collectionCommissionPct": { "type": "number" },
+        "active": { "type": "boolean" },
+        "allowedModules": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "code", "salesCommissionPct", "collectionCommissionPct"]
+    },
+    "RouteSheet": {
+      "title": "Route Sheet",
+      "description": "Daily customer visit roadmap and check-in log for street sales reps",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string", "maxLength": 30 },
+        "sellerId": { "type": "string", "maxLength": 100 },
+        "sellerName": { "type": "string", "maxLength": 100 },
+        "date": { "type": "string" },
+        "zone": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "status": { "type": "string", "enum": ["borrador", "en_progreso", "completada", "cancelada"] },
+        "stops": { "type": "array" },
+        "totalStops": { "type": "number" },
+        "visitedStops": { "type": "number" },
+        "totalSalesGenerated": { "type": "number" },
+        "totalCollectionsGenerated": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "code", "sellerId", "date", "status"]
     }
   },
   "firestore": {
-    "/nova_system_data/{dataId}": {
-      "schema": "NovaSystemData",
-      "description": "Collection storing business system states and local backups"
+    "/raw_materials/{materialId}": {
+      "schema": "RawMaterial",
+      "description": "Chemicals, resins, pigments and containers inventory"
+    },
+    "/formulas/{formulaId}": {
+      "schema": "Formula",
+      "description": "Paint product master formulations"
+    },
+    "/production_orders/{orderId}": {
+      "schema": "ProductionOrder",
+      "description": "Factory manufacturing batches and packaging orders"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Finished paint products catalog with pricing tiers"
+    },
+    "/inventory_movements/{movementId}": {
+      "schema": "InventoryMovement",
+      "description": "Real-time inventory audit logs"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Clients with DNI/CUIT for portal lookup and ledger"
+    },
+    "/sales_orders/{orderId}": {
+      "schema": "SalesOrder",
+      "description": "Sales orders with stage tracking (picking, invoice, dispatch)"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "ARCA and internal sales invoices"
+    },
+    "/transports/{transportId}": {
+      "schema": "Transport",
+      "description": "Shipping companies and truck routes"
+    },
+    "/suppliers/{supplierId}": {
+      "schema": "Supplier",
+      "description": "Raw material suppliers"
+    },
+    "/purchase_orders/{orderId}": {
+      "schema": "PurchaseOrder",
+      "description": "Raw material purchase orders"
+    },
+    "/financial_transactions/{transactionId}": {
+      "schema": "FinancialTransaction",
+      "description": "Cash flow and payment records"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Automated system and operational notifications"
+    },
+    "/company_config/{configId}": {
+      "schema": "CompanyConfig",
+      "description": "Paint factory corporate and ARCA configuration"
+    },
+    "/sellers/{sellerId}": {
+      "schema": "Seller",
+      "description": "Street sales representatives with commission rates and module permissions"
+    },
+    "/route_sheets/{routeSheetId}": {
+      "schema": "RouteSheet",
+      "description": "Daily visit roadmaps and check-in records for street sales reps"
+    },
+    "/internal_installments/{planId}": {
+      "schema": "InternalInstallmentPlan",
+      "description": "In-house financing and installment agreements with 2-copy printed contracts"
+    },
+    "/loyalty_rewards/{rewardId}": {
+      "schema": "LoyaltyReward",
+      "description": "Points reward catalog with point costs, stock and coupon redemption"
+    },
+    "/loyalty_redemptions/{redemptionId}": {
+      "schema": "LoyaltyRedemption",
+      "description": "Customer reward redemption coupons with unique security code"
+    },
+    "/loyalty_transactions/{transactionId}": {
+      "schema": "LoyaltyTransaction",
+      "description": "Ledger of earned and spent loyalty points"
+    },
+    "/loyalty_raffles/{raffleId}": {
+      "schema": "LoyaltyRaffle",
+      "description": "Customer loyalty raffles and prize draws"
+    },
+    "/cash_register_sessions/{sessionId}": {
+      "schema": "CashRegisterSession",
+      "description": "POS operating register shifts with strict cash audit"
+    },
+    "/arca_vouchers/{voucherId}": {
+      "schema": "ArcaElectronicVoucher",
+      "description": "Official ARCA electronic invoices and vouchers with CAE and verification QR"
     }
   }
 }

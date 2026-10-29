@@ -1,0 +1,563 @@
+PROMPT MAESTRO
+Actúa como arquitecto y desarrollador senior full-stack. Debes duplicar de forma funcional, segura y mantenible el ERP completo de una ferretería/distribuidora argentina llamado “Nova Systems” (o conservar el nombre que indique el propietario).
+No construyas una landing, una maqueta, un prototipo visual ni una demo con datos en memoria. Debes producir una aplicación operativa, persistente y preparada para continuar con datos reales.
+======================================================================
+1. FUENTE DE VERDAD Y ALCANCE
+======================================================================
+Si se proporciona el repositorio original:
+- Inspecciona primero todo el árbol del proyecto, package.json, configuración de Vite/Express, shared/schema.ts, migraciones, rutas, servicios, páginas, componentes, hooks, autenticación, assets y documentación.
+- Trata el código fuente, el esquema de base de datos y las migraciones como la fuente de verdad. No reemplaces funcionalidades existentes por una interpretación resumida de este prompt.
+- Conserva nombres de campos, relaciones, estados, códigos de módulos, rutas API y reglas compatibles salvo que una migración explícita sea necesaria.
+- Detecta las funciones existentes aunque no estén mencionadas en esta especificación.
+- Si el material recibido es incompleto, enumera qué falta y continúa implementando todo lo que sí puede verificarse. No inventes integraciones como si estuvieran conectadas.
+Si se proporciona solo este prompt:
+- Implementa la arquitectura completa descripta aquí.
+- Marca claramente cualquier proveedor externo que requiera configuración posterior.
+- No uses localStorage, Firebase, datos mock ni una base paralela como sustituto de PostgreSQL.
+El objetivo es que la réplica tenga paridad funcional con el sistema original, incluyendo:
+- POS y ventas.
+- Productos, precios, compras, stock y depósitos.
+- Clientes, proveedores y cuentas corrientes.
+- Compras, pagos, cobranzas y financiación interna.
+- Cajas registradoras, cajas de dinero, bancos y formas de pago.
+- Ecommerce minorista y mayorista.
+- ARCA/AFIP y facturación electrónica.
+- Empleados, sueldos, usuarios, roles y permisos.
+- Fidelización, portal de clientes, premios, puntos, referidos, encuestas y sorteos.
+- WhatsApp, Gmail, Twilio, Meta, MercadoLibre, MercadoPago y OpenAI cuando estén configurados.
+- Servicio técnico, envíos, chat interno, panel de agentes, marketing IA y backups.
+======================================================================
+2. ARQUITECTURA TÉCNICA OBLIGATORIA
+======================================================================
+Usa una arquitectura full-stack TypeScript en monorepo:
+- Frontend: React, TypeScript y Vite.
+- Routing: conservar Wouter si forma parte del código original.
+- Estado del servidor: TanStack React Query.
+- UI: shadcn/ui, Radix UI, Tailwind CSS y Lucide React, respetando el sistema visual existente.
+- Formularios y validación: React Hook Form y Zod.
+- Gráficos: Recharts cuando corresponda.
+- Backend: Express.js en TypeScript.
+- Base de datos: PostgreSQL.
+- ORM y esquema: Drizzle ORM y Drizzle Kit.
+- Sesiones: PostgreSQL-backed sessions.
+- Autenticación: conservar Replit Auth/OIDC y la autenticación de empleados existentes; no sustituirlas por un sistema simplificado.
+- Tiempo real: conservar Socket.io para chat, notificaciones y actualizaciones que ya lo utilicen.
+- Producción: mantener el build con Vite para el frontend y esbuild para el servidor, o reproducir exactamente la estrategia del repositorio entregado.
+- Almacenamiento de archivos: usar el object storage configurado, diferenciando objetos públicos y privados.
+- El servidor debe escuchar correctamente en el puerto provisto por el workflow y permitir el acceso por el proxy de preview.
+- Las llamadas del frontend al backend deben usar rutas relativas, no localhost hardcodeado.
+Reglas de arquitectura:
+- El servidor es la autoridad para permisos, stock, saldos, puntos, estados fiscales, caja y operaciones financieras.
+- Cada operación que modifique varias tablas debe ejecutarse en una transacción.
+- No confíes en cálculos enviados por el navegador: recalcula importes, descuentos, impuestos, stock y puntos en el servidor.
+- Todas las entradas de API deben validarse con Zod o el mecanismo equivalente ya utilizado.
+- Las respuestas de error deben ser explícitas, útiles para el usuario y registradas de forma segura.
+- No ocultes errores con fallbacks silenciosos ni reemplaces datos faltantes por datos ficticios.
+- No expongas secretos al cliente, en HTML, en logs, en documentos públicos ni en mensajes de error.
+- Mantén compatibilidad con las migraciones y evita borrar datos históricos.
+======================================================================
+3. MODELO DE DATOS Y PERSISTENCIA
+======================================================================
+Reproduce shared/schema.ts completo, sus relaciones, índices, restricciones, tipos y migraciones. Como mínimo, organiza y verifica estos dominios:
+Catálogo y stock:
+- categories, brands, products.
+- productCombos, combos, comboItems.
+- warehouses, stockLocations, productWarehouseStock.
+- stockMovements, stockTransfers y stockTransferItems.
+- priceLists, priceListItems, priceUpdateLogs.
+- promociones, etiquetas y configuraciones de impresión.
+Clientes y proveedores:
+- clients y clientAuthorizedContacts.
+- clientAccountMovements.
+- suppliers, supplierAccountMovements.
+- supplierProductDiscounts, supplierImportTemplates y supplierWebConfigs.
+- notas CRM y oportunidades CRM.
+Ventas y documentos:
+- sales, saleItems, salePayments, saleRetentions.
+- deliveryNotes y deliveryNoteItems.
+- preInvoices y su relación con remitos.
+- quotes y quoteItems.
+- customerOrders y customerOrderItems.
+- devoluciones de ventas y sus ítems.
+- comprobantes electrónicos.
+Compras:
+- purchases y purchaseItems.
+- purchaseOrders y purchaseOrderItems.
+- comprobantes y devoluciones de compras.
+- recibos de proveedores y sus ítems.
+Cajas, pagos y finanzas:
+- cashRegisters, cashRegisterSessions, cashMovements.
+- moneyBoxes, moneyBoxMovements.
+- paymentMethods.
+- cardConfigurations, cardInstallmentPlans y sus relaciones.
+- digitalWallets.
+- bankAccounts, bankTransactions y checksWallet.
+- clientReceipts, clientReceiptItems y retenciones.
+- supplierReceipts y supplierReceiptItems.
+- expenseCategories, fixedExpenses, financialReminders.
+- savingsPlans, savingsContributions y emergencyCushion.
+Empresa, usuarios y operaciones:
+- companySettings.
+- employees, employeeAbsences, employeeAdvances, employeeBonusDates, employeeVacations.
+- payrollPayments.
+- usuarios, roles, módulos y permisos según los modelos de autenticación entregados.
+- tasks, desktopShortcuts y configuraciones de impresión.
+Ecommerce, distribución y envíos:
+- ecommerceSettings, ecommerceOrders, ecommerceOrderItems y shoppingCarts.
+- wholesalePriceTiers.
+- wholesaleOrders, wholesaleOrderItems.
+- wholesalePortalTokens y wholesaleRegistrations.
+- branchOrders y branchOrderItems.
+- shippingCarriers, shipments y shipmentEvents.
+Integraciones y comunicación:
+- channelConfig, channelConversations y channelMessages.
+- whatsappBotConfig, whatsappConversations, whatsappMessages.
+- whatsappCampaigns y whatsappCampaignRecipients.
+- internalChatRooms, internalChatMembers e internalChatMessages.
+- birthdays y configuración de cumpleaños.
+- marketingCampaigns.
+- configuraciones y publicaciones de MercadoLibre.
+- configuraciones de Meta Ads.
+Fidelización:
+- loyaltyProgram.
+- clientLoyaltyPoints.
+- loyaltyTransactions.
+- loyaltyTiers.
+- loyaltyRewards.
+- loyaltyRedemptions.
+- loyaltyReferrals.
+- loyaltyBonusRules.
+- loyaltyCoupons y loyaltyOffers.
+- loyaltySurveys y loyaltySurveyResponses.
+- loyaltyRaffles y loyaltyRaffleEntries.
+- loyaltyBranches.
+Importante:
+- Usa PostgreSQL como persistencia única.
+- Conserva relaciones y referencias históricas.
+- Usa soft-delete o estados inactivos cuando borrar físicamente rompería reportes, nómina, caja, puntos o trazabilidad.
+- Los importes monetarios deben manejarse con precisión decimal; no uses cálculos financieros basados únicamente en floats del navegador.
+- Agrega índices y restricciones para CUIT/DNI, códigos, números de comprobante, referencias de movimientos, tokens y estados únicos.
+- Si la base original está disponible, crea un procedimiento seguro de restauración y verifica conteos, relaciones y datos huérfanos después de importarla.
+======================================================================
+4. AUTENTICACIÓN, ROLES Y PERMISOS
+======================================================================
+Implementa dos superficies:
+1. Panel interno para empleados y administradores.
+2. Portales públicos o autenticados para clientes minoristas y mayoristas.
+El panel interno debe:
+- Requerir autenticación.
+- Respetar rol, permisos CRUD, módulos autorizados, depósito, sucursal y caja asignados.
+- Proteger las rutas tanto en frontend como en backend.
+- Ocultar opciones no autorizadas sin depender únicamente de ocultar el menú.
+- Auditar operaciones sensibles cuando el sistema original ya lo haga.
+El portal de clientes debe:
+- Usar el token o mecanismo de portal existente.
+- Separar el contexto del cliente del contexto del empleado.
+- No permitir acceder a datos de otro cliente modificando un ID en la URL.
+- Mostrar solo saldos, pedidos, puntos, premios y comprobantes autorizados.
+El portal mayorista debe:
+- Mantener sus tokens, registros y niveles de precio.
+- Requerir aprobación cuando el flujo original la requiera.
+- Respetar listas, condiciones comerciales y cuenta corriente del cliente.
+Los empleados desactivados deben quedar inactivos y no eliminarse físicamente si tienen historial de ventas, bonos, nómina o auditoría.
+======================================================================
+5. MÓDULOS Y PANTALLAS
+======================================================================
+Reproduce las rutas, menús, guards, códigos de módulo y navegación del sistema original. Si se parte solo de este prompt, crea como mínimo estas secciones:
+Ventas:
+- POS.
+- Historial de ventas.
+- Comprobantes y recibos.
+- Remitos.
+- Presupuestos/cotizaciones.
+- Pedidos.
+- Devoluciones.
+- Ofertas y promociones.
+- Clientes.
+- Fidelización, cupones, cumpleaños y sorteos.
+- Ecommerce.
+- MercadoLibre.
+- Servicio técnico.
+Distribuidora:
+- Pedidos mayoristas.
+- Gestión de envíos.
+- Portal mayorista.
+- Tienda mayorista.
+- Catálogo visual.
+Compras:
+- Pedidos de compra.
+- Proveedores.
+- Compras y comprobantes.
+- Compras asistidas por IA.
+- Automatización de proveedores.
+Productos y stock:
+- Inventario.
+- Combos.
+- Marcas y rubros.
+- Actualización masiva de precios.
+- Listas de precios.
+- Etiquetas y códigos.
+- Stock y faltantes.
+- Ajustes.
+- Depósitos.
+- Transferencias.
+Finanzas:
+- Cajas registradoras.
+- Cajas de dinero.
+- Recibos.
+- Movimientos financieros.
+- Saldos.
+- Cuotas internas.
+- Gastos fijos.
+- Bancos.
+- Tarjetas.
+- Billeteras digitales.
+- Finanzas e inteligencia financiera.
+- Contabilidad.
+- Reportes.
+- IVA/CITI.
+Empresa:
+- ARCA/facturación electrónica.
+- Empleados.
+- Sueldos y pagos de nómina.
+- Usuarios, roles y permisos.
+- Configuración general.
+- Integraciones.
+- Importación y gestión de datos.
+- Backups.
+- Tareas.
+- Asistente del sistema.
+- Chat interno.
+- Panel de agentes multicanal.
+Cada pantalla debe tener estados de carga, vacío, error, éxito, validación, permisos insuficientes y confirmación antes de operaciones destructivas. En móvil debe seguir siendo utilizable sin romper tablas, POS, formularios ni comprobantes imprimibles.
+======================================================================
+6. POS, VENTAS Y DOCUMENTOS
+======================================================================
+El POS debe permitir:
+- Buscar por nombre, SKU, código de barras y otros identificadores existentes.
+- Seleccionar cliente, vendedor, depósito, lista de precios y condiciones comerciales.
+- Agregar productos, combos, cantidades, unidades, descuentos, recargos e impuestos.
+- Consultar stock real y reservar/descontar según la regla del sistema.
+- Registrar uno o varios medios de pago.
+- Emitir ticket, factura, nota de crédito, remito, presupuesto u otro documento soportado.
+- Imprimir o descargar comprobantes con formato consistente.
+- Asociar la venta al usuario/empleado y a la sesión de caja.
+- Crear movimientos de caja, cuenta corriente, banco o billetera según el medio usado.
+- Aplicar devoluciones conservando trazabilidad y sin duplicar stock ni saldos.
+Una venta confirmada y sus efectos relacionados deben ser atómicos: si falla la autorización fiscal, el movimiento financiero o la actualización de stock, no dejes una venta parcialmente confirmada salvo que el flujo original defina expresamente un estado pendiente.
+El número de recibo, comprobante y documento fiscal debe ser único dentro del ámbito correspondiente. No reutilices números históricos.
+======================================================================
+7. CUENTAS CORRIENTES, COBRANZAS Y PAGOS
+======================================================================
+Implementa:
+- Cuenta corriente de clientes.
+- Cuenta corriente de proveedores.
+- Recibos de cobranza.
+- Pagos a proveedores.
+- Aplicación de cobranzas a movimientos pendientes.
+- Retenciones y comprobantes relacionados.
+- Cuotas y vencimientos.
+- Saldos, vencidos, pagos parciales y conciliación.
+Reglas obligatorias:
+- El medio real de cobro debe quedar asociado al movimiento.
+- `no_pago` no significa dinero recibido: no debe crear efectivo ficticio ni inflar caja.
+- Una cobranza de cuenta corriente puede asociarse a movimientos de sesión, pero no debe contarse como efectivo si no tiene medio `cash` explícito.
+- Los movimientos sin medio de pago identificado no deben inflar el efectivo esperado del cierre.
+- No compenses saldos con cambios directos sin registrar el movimiento de ajuste correspondiente.
+- Toda reversión debe dejar rastro y referencia al movimiento original.
+======================================================================
+8. CAJAS, DINERO, BANCOS Y CIERRES
+======================================================================
+Distingue estrictamente:
+- Caja registradora: punto o sesión operativa donde se venden/cobran operaciones.
+- Caja de dinero: fondo físico o cuenta interna donde se guarda dinero.
+- Cuenta bancaria.
+- Billetera digital.
+- Cheques y valores.
+No mezcles IDs entre cajas de dinero y cajas registradoras. Si el frontend usa selects que combinan ambos tipos, usa valores con prefijos inequívocos como `mb-{id}` y `reg-{id}` y tradúcelos correctamente en el servidor.
+El cierre de caja debe:
+- Verificar sesión abierta y usuario autorizado.
+- Calcular esperado por movimientos clasificados.
+- Considerar efectivo solamente con medio `cash` explícito.
+- Excluir movimientos no clasificados o `no_pago` del efectivo esperado.
+- Registrar contado, diferencia, observaciones y responsable.
+- Permitir transferencias a la caja de dinero o banco según configuración.
+- No alterar silenciosamente la historia de movimientos.
+Los saldos de bancos y billeteras deben actualizarse a partir de transacciones registradas, con filtros por fecha, cuenta, medio, estado y referencia.
+======================================================================
+9. CUOTAS INTERNAS
+======================================================================
+Implementa planes de financiación internos con:
+- Cliente.
+- Productos incluidos.
+- Precio unitario editable dentro del plan sin modificar el catálogo.
+- Anticipo, cantidad de cuotas, frecuencia, vencimientos, importe y estado.
+- Pagos parciales y completos.
+- Historial imprimible.
+- Constancia/contrato en dos copias.
+Regla exacta:
+- La primera cuota vence el mismo día en que se crea el plan.
+- La primera cuota no se marca pagada automáticamente.
+- Crear el plan no equivale a cobrar la primera cuota.
+El documento de impresión debe mostrar la información suficiente para identificar plan, cliente, productos, importes, cuotas, vencimientos, estado de pagos, fecha y firma.
+======================================================================
+10. FIDELIZACIÓN Y PORTAL DE CLIENTES
+======================================================================
+La fidelización debe ser persistente en PostgreSQL y operar con las transacciones del servidor. No uses una tienda demo paralela ni localStorage para saldos.
+Incluye:
+- Programa configurable.
+- Puntos por compras.
+- Niveles/tier y multiplicadores.
+- Premios con imagen, categoría, costo, stock, estado, términos y precio de referencia.
+- Canjes y cupones con código único.
+- Historial de movimientos.
+- Referidos.
+- Encuestas con premio.
+- Sorteos ponderados por entradas.
+- Bonificaciones por día, monto o regla.
+- Sucursales.
+- Cumpleaños.
+- Popup promocional.
+- Dashboard y métricas administrativas.
+- Carga rápida de puntos.
+- Validación/entrega de cupones.
+- Generación de enlaces y códigos QR.
+Reglas exactas actuales:
+- `pointsPerCurrency = 0.01`: se acredita 1 punto cada $100, antes de multiplicadores o bonos configurados.
+- Las ventas con medio `no_pago` no generan puntos.
+- Los puntos de una venta se vinculan con `referenceType: "sale"` y `referenceId`.
+- Los clientes con `hasCurrentAccount === true` quedan siempre excluidos de fidelización.
+- El campo `clients.loyaltyEligible` permite habilitar o deshabilitar la participación individual, pero nunca puede contradecir la exclusión automática por cuenta corriente.
+- La exclusión se valida en el servidor para ventas, ajustes manuales, cargas por compra, puntos de bienvenida, referidos, encuestas, sorteos y canjes.
+- El portal debe mostrar “No participa” y ocultar saldo, historial y acciones de puntos para clientes excluidos.
+- El reset de fidelización es administrativo, manual, confirmado y transaccional.
+- El reset pone en cero `points`, `totalEarned` y `totalRedeemed`, y elimina `loyaltyTransactions`.
+- El reset conserva premios, canjes, referidos, encuestas y sorteos.
+- No ejecutes el reset durante la migración ni la inicialización.
+- Una recompensa solo puede canjearse si el cliente participa, tiene saldo suficiente, el premio está activo y hay stock.
+- La entrada a un sorteo descuenta puntos y registra la entrada.
+- No entregues premios dos veces por reintentos de la misma solicitud.
+El portal debe mostrar:
+- Saldo y nivel cuando corresponda.
+- Movimientos.
+- Premios disponibles.
+- Canjes y estado del cupón.
+- Referidos.
+- Encuestas.
+- Sorteos.
+- Sucursales.
+- Promociones y popup.
+======================================================================
+11. ARCA/AFIP Y FACTURACIÓN ELECTRÓNICA
+======================================================================
+Implementa el servicio fiscal argentino existente, manteniendo:
+- Ambientes de homologación y producción.
+- Autenticación WSAA con certificado y clave privada.
+- Autorización WSFE.
+- Consulta de estado.
+- Último comprobante por tipo.
+- Consulta de comprobantes.
+- Consulta de tipos de comprobante.
+- Consulta de padrón cuando esté autorizado.
+- Almacenamiento de CAE, vencimiento, número, tipo, punto de venta, fecha, IVA, total, QR, resultado y estado.
+Debe haber tres vías compatibles:
+1. POS automático: al crear una venta fiscal, autorizar y guardar la factura electrónica, y actualizar el estado fiscal de la venta.
+2. Autorización manual: permitir autorizar ventas pendientes desde la pantalla fiscal.
+3. WhatsApp: generar la factura, almacenar el resultado, generar PDF con CAE/QR y enviarla al cliente.
+No asumas que las credenciales de facturación autorizan consultas de padrón CUIT. Si el padrón no está habilitado, informa el error de autorización de forma clara.
+Nunca incluy certificados, claves privadas, tokens ni credenciales en el repositorio, prompt, capturas, logs o documento generado. Usa placeholders y secretos del entorno.
+======================================================================
+12. PAGOS E INTEGRACIONES EXTERNAS
+======================================================================
+Conserva las integraciones que existan en el código original y hazlas configurables:
+- MercadoPago.
+- Meta Cloud API: WhatsApp, Facebook e Instagram.
+- Twilio.
+- Gmail para notificaciones o extractos bancarios.
+- MercadoLibre.
+- OpenAI para asistente, marketing, compras, cotizaciones y bot de WhatsApp.
+- Object storage para archivos e imágenes.
+- Socket.io para tiempo real.
+Cada integración debe:
+- Tener configuración separada por entorno cuando corresponda.
+- Guardar solo referencias o configuraciones no sensibles en PostgreSQL.
+- Leer secretos exclusivamente del mecanismo seguro del entorno.
+- Tener estado de conexión, prueba explícita y mensajes de error accionables.
+- Evitar reintentos infinitos y duplicación de mensajes, publicaciones, pagos o facturas.
+- Registrar logs sin incluir tokens, headers de autorización, cuerpos sensibles ni datos personales innecesarios.
+- Permitir reautenticación en el proyecto duplicado.
+No inventes que una integración está activa solo porque existe la pantalla. Si faltan credenciales, deja la configuración pendiente y el resto del ERP debe seguir funcionando.
+Para OpenAI:
+- Mantén el comportamiento y prompts del sistema original.
+- Haz el nombre del modelo configurable por entorno o configuración segura.
+- No hardcodees claves.
+- No cambies automáticamente de modelo durante la duplicación sin una decisión separada.
+======================================================================
+13. WHATSAPP, AGENTES Y COMUNICACIÓN
+======================================================================
+Reproduce:
+- Webhook de WhatsApp.
+- Conversaciones y mensajes.
+- Búsqueda de productos por nombre, SKU y código.
+- Carrito por teléfono con persistencia o estrategia equivalente segura.
+- Confirmación de pedidos.
+- Creación de ventas.
+- Facturación ARCA.
+- Generación y envío de PDF.
+- Campañas masivas con destinatarios, estados y control de duplicados.
+- Panel de agentes para canales multicanal.
+- Chat interno de empleados con chats directos y grupales.
+- Mensajes urgentes no descartables cuando esa regla exista.
+- Mensajes no leídos y entrega en tiempo real.
+Valida firma y origen de webhooks, protege contra replay, escapa contenido de usuarios y no expongas conversaciones de un cliente a otro.
+======================================================================
+14. MARKETING, ECOMMERCE Y DISTRIBUCIÓN
+======================================================================
+Ecommerce minorista:
+- Catálogo público.
+- Carrito.
+- Configuración de métodos de pago.
+- Pago contra entrega, transferencia, MercadoPago y tarjeta cuando estén habilitados.
+- Pedidos, estados, stock, cliente, envío y comprobantes.
+Tienda y portal mayorista:
+- Registro y aprobación.
+- Tokens.
+- Niveles de precio.
+- Carrito y pedidos mayoristas.
+- Cuenta corriente cuando corresponda.
+- Catálogo visual.
+MercadoLibre:
+- Publicaciones.
+- Sincronización de productos, precios, stock y estados.
+- Control de errores y límites.
+Marketing:
+- Campañas.
+- Generación de contenido con IA.
+- Análisis de imágenes de productos.
+- Generación de imágenes si está habilitada.
+- Publicación en Facebook, Instagram, banners y WhatsApp masivo.
+- Métricas de impresiones, clics y conversiones cuando estén disponibles.
+Servicio técnico:
+- Órdenes de servicio.
+- Cliente, equipo, diagnóstico, estado, eventos, presupuesto, repuestos y entrega.
+Envíos:
+- Transportistas.
+- Envíos.
+- Eventos y seguimiento.
+- Estados coherentes con pedidos y entregas.
+======================================================================
+15. BACKUPS, IMPORTACIÓN Y RECUPERACIÓN
+======================================================================
+Implementa o conserva:
+- Backup diario mediante pg_dump.
+- Compresión.
+- Retención configurable.
+- Almacenamiento remoto opcional.
+- Historial y estados visibles para administradores.
+- Restauración documentada y protegida.
+- Importación de productos, clientes, proveedores, stock y finanzas con validación, previsualización y reporte de errores.
+Nunca sobrescribas datos reales sin confirmación explícita y sin backup previo.
+Un backup restaurable debe incluir:
+- Esquema y migraciones compatibles.
+- Datos PostgreSQL.
+- Referencias o archivos del object storage necesarios.
+- Configuración no sensible.
+- Lista de integraciones que deberán reautorizarse.
+Los backups descargados desde el navegador requieren permisos explícitos de carpeta; no prometas que una aplicación web puede escribir silenciosamente en una ruta local escrita por el usuario.
+======================================================================
+16. SEGURIDAD Y PROTECCIÓN DE DATOS
+======================================================================
+Cumple estas reglas:
+- No copies secretos reales.
+- No copies SESSION_SECRET, DATABASE_URL, certificados, claves privadas, tokens, credenciales de proveedores ni datos personales reales.
+- Usa placeholders como `CONFIGURAR_EN_SECRETS`, `CUIT_DE_LA_EMPRESA` y `ID_DEL_BUCKET`.
+- Separa preview/development de production.
+- Mantén integraciones y secretos server-only.
+- Protege sesiones, cookies, CSRF si aplica, rate limiting y endpoints administrativos.
+- Valida IDs y ownership en cada endpoint.
+- Sanitiza archivos subidos y limita tamaño/tipo.
+- No permitas path traversal ni acceso directo a objetos privados.
+- Redacta PII y secretos en logs.
+- No uses datos reales para seed salvo que estén anonimizados y exista autorización.
+- Mantén trazabilidad de ajustes de caja, stock, cuentas, puntos, facturas, permisos y borrados lógicos.
+======================================================================
+17. PLAN DE IMPLEMENTACIÓN
+======================================================================
+Trabaja en este orden:
+Fase 1 — Inventario:
+- Analiza estructura, dependencias, rutas, esquema, migraciones y configuración.
+- Compara la réplica con el original.
+- Produce una lista de faltantes antes de borrar o reemplazar código.
+Fase 2 — Base:
+- Configura el proyecto y el workflow.
+- Conecta PostgreSQL.
+- Reproduce migraciones, relaciones e índices.
+- Configura autenticación y sesiones.
+- Verifica que el servidor inicia y que el frontend carga.
+Fase 3 — ERP núcleo:
+- Productos, stock, clientes, proveedores, compras, ventas y POS.
+- Cajas, medios de pago, cuentas corrientes y comprobantes.
+- Pruebas transaccionales de stock, saldos y cierre.
+Fase 4 — Fiscal y finanzas:
+- ARCA, recibos, bancos, cuotas, gastos, reportes IVA/CITI y contabilidad.
+Fase 5 — Portales y fidelización:
+- Ecommerce, mayorista, portal de clientes, puntos, premios, canjes, referidos, encuestas y sorteos.
+Fase 6 — Integraciones:
+- WhatsApp, Meta, Gmail, Twilio, MercadoLibre, MercadoPago, OpenAI, object storage y Socket.io.
+- Las integraciones sin credenciales deben quedar claramente pendientes, no simuladas.
+Fase 7 — Operación:
+- Backups, importaciones, empleados, nómina, permisos, auditoría, service técnico, envíos, marketing y chat.
+Fase 8 — Verificación:
+- Ejecuta build, validaciones, migraciones y pruebas.
+- Reinicia el workflow después de cambios de código, dependencias o comandos.
+- Revisa logs del servidor y consola del navegador.
+- Verifica el preview con las rutas principales.
+- Corrige errores antes de declarar terminada la réplica.
+======================================================================
+18. CRITERIOS DE ACEPTACIÓN
+======================================================================
+La réplica solo está terminada cuando:
+- El build de producción es exitoso.
+- El workflow inicia sin errores manifiestos y expone el puerto configurado.
+- PostgreSQL está conectado y las migraciones se aplican sin pérdida de datos.
+- El login y los guards de permisos funcionan en servidor y frontend.
+- Se puede crear una venta, descontar stock, registrar el pago, actualizar caja y consultar el comprobante.
+- Se puede hacer una devolución sin duplicar stock ni romper saldos.
+- Las cuentas corrientes reflejan cargos, cobranzas, pagos parciales y saldos.
+- El cierre de caja calcula efectivo únicamente con medios `cash` explícitos.
+- Los movimientos `no_pago` y sin medio identificado no inflan el efectivo.
+- Las cuotas respetan el vencimiento y el estado de la primera cuota.
+- La facturación fiscal usa estados pendientes/autorizados/error sin perder trazabilidad.
+- Los clientes con cuenta corriente no reciben puntos.
+- La fidelización respeta `pointsPerCurrency = 0.01`, elegibilidad, referencias de ventas y exclusiones.
+- El reset de puntos requiere confirmación y conserva los datos que debe conservar.
+- El portal no permite consultar datos de otro cliente.
+- Los premios, canjes, stock y cupones son atómicos e idempotentes.
+- Los portales minorista y mayorista crean pedidos persistentes.
+- Los backups se generan y pueden verificarse.
+- Las pantallas sensibles no exponen secretos.
+- Las integraciones muestran correctamente conectado, pendiente o error.
+- No quedan datos mock, localStorage ni Firebase como fuente de verdad de una funcionalidad operativa.
+- La interfaz es usable en desktop y móvil, con estados de carga/error/vacío y controles accesibles.
+Al finalizar, entrega:
+1. Resumen de lo implementado.
+2. Lista de archivos y migraciones relevantes.
+3. Variables de entorno y secretos requeridos, solo por nombre y nunca por valor.
+4. Integraciones pendientes de reautorización.
+5. Comandos de instalación, migración, desarrollo, build, backup y restauración.
+6. Pruebas ejecutadas y resultados.
+7. Riesgos o diferencias restantes respecto del sistema original.
+No declares paridad total si alguna pantalla, ruta, tabla, integración o regla de negocio quedó reemplazada por una simulación.
+Insumos que deben acompañar al prompt
+Para una duplicación exacta, el prompt por sí solo no alcanza. Deben proporcionarse:
+
+Código fuente completo, incluyendo archivos ocultos de configuración que no contengan secretos.
+package.json, lockfile, configuración de TypeScript, Vite, Tailwind, esbuild y workflows.
+shared/schema.ts, migraciones y cualquier seed autorizado.
+server/, client/, shared/ y assets públicos.
+Plantillas de impresión, PDFs, logos, imágenes y archivos del object storage que sean necesarios.
+Backup PostgreSQL compatible, preferentemente anonimizado si contiene datos reales.
+Inventario de variables de entorno por nombre, sin sus valores.
+Lista de integraciones que deben reautorizarse en el nuevo proyecto.
+Reglas fiscales y configuración de empresa que el nuevo titular deba completar.
+Usuarios iniciales o procedimiento de alta segura, nunca contraseñas dentro del prompt.
