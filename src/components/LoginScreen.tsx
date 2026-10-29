@@ -24,6 +24,14 @@ interface LoginScreenProps {
   onOpenCustomerPortal: () => void;
   onOpenMobileSellerApp?: () => void;
   config?: CompanyConfig | null;
+  /** Modo demo: login con 1 clic y claves de prueba visibles. */
+  modoDemo?: boolean;
+  /** Modo producción: inicia sesión con Firebase Auth. Devuelve un mensaje de error o null. */
+  onPasswordLogin?: (email: string, password: string) => Promise<string | null>;
+  /** Modo producción: envía el email para restablecer la contraseña. Devuelve un mensaje de error o null. */
+  onForgotPassword?: (email: string) => Promise<string | null>;
+  /** Mensaje a mostrar al abrir la pantalla (ej: usuario inactivo). */
+  initialError?: string | null;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -31,18 +39,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLogin,
   onOpenCustomerPortal,
   onOpenMobileSellerApp,
-  config
+  config,
+  modoDemo = true,
+  onPasswordLogin,
+  onForgotPassword,
+  initialError = null
 }) => {
   const [emailOrUser, setEmailOrUser] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
+  const [info, setInfo] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [selectedUserForForgot, setSelectedUserForForgot] = useState<AppUser | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setInfo(null);
+
+    if (!modoDemo) {
+      if (!emailOrUser.trim() || !password) {
+        setError('Ingresá tu email y tu contraseña.');
+        return;
+      }
+      if (!onPasswordLogin) return;
+      setIsSubmitting(true);
+      const err = await onPasswordLogin(emailOrUser, password);
+      setIsSubmitting(false);
+      if (err) setError(err);
+      return;
+    }
 
     const term = emailOrUser.trim().toLowerCase();
     if (!term) {
@@ -81,6 +108,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     // Success login
     onLogin(found);
+  };
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    setInfo(null);
+    if (modoDemo) {
+      setShowForgotModal(true);
+      return;
+    }
+    if (!emailOrUser.trim()) {
+      setError('Escribí tu email arriba y volvé a tocar "¿Olvidaste tu contraseña?".');
+      return;
+    }
+    if (!onForgotPassword) return;
+    const err = await onForgotPassword(emailOrUser);
+    if (err) {
+      setError(err);
+    } else {
+      setInfo(`Si ${emailOrUser.trim()} tiene una cuenta, te enviamos un email para crear una contraseña nueva.`);
+    }
   };
 
   const handleSelectUser = (u: AppUser) => {
@@ -155,7 +202,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             ¡Bienvenido a {brandTradeName}!
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
-            ¿Todavía no tienes cuenta? <span className="text-slate-900 font-semibold cursor-pointer hover:underline" onClick={() => setShowForgotModal(true)}>Contactá al Administrador.</span>
+            ¿Todavía no tienes cuenta? <span className={`text-slate-900 font-semibold ${modoDemo ? 'cursor-pointer hover:underline' : ''}`} onClick={() => modoDemo && setShowForgotModal(true)}>Contactá al Administrador.</span>
           </p>
         </div>
 
@@ -177,6 +224,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
           )}
 
+          {info && (
+            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>{info}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Field */}
             <div>
@@ -184,11 +238,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 Email
               </label>
               <div className="relative">
-                <input 
-                  type="text"
+                <input
+                  type={modoDemo ? 'text' : 'email'}
+                  autoComplete="username"
                   value={emailOrUser}
                   onChange={e => setEmailOrUser(e.target.value)}
-                  placeholder="demo@colorearpinturas.com.ar"
+                  placeholder={modoDemo ? 'demo@colorearpinturas.com.ar' : 'tu@email.com'}
                   className="w-full px-4 py-3.5 rounded-2xl bg-[#eff4fc] hover:bg-[#e8f0fe] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900 border border-transparent focus:border-slate-300 text-sm font-medium text-slate-900 transition-all placeholder:text-slate-400"
                 />
               </div>
@@ -202,7 +257,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </label>
                 <button
                   type="button"
-                  onClick={() => setShowForgotModal(true)}
+                  onClick={handleForgotPassword}
                   className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   ¿Olvidaste tu contraseña?
@@ -211,6 +266,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <div className="relative">
                 <input 
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -234,14 +290,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {/* Submit Button (matching dark bold button in reference image) */}
             <button
               type="submit"
-              className="w-full mt-2 py-3.5 px-4 bg-[#1e2329] hover:bg-black text-white font-bold text-sm rounded-2xl shadow-lg shadow-slate-900/10 transition-all active:scale-[0.99] flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full mt-2 py-3.5 px-4 bg-[#1e2329] hover:bg-black disabled:opacity-60 text-white font-bold text-sm rounded-2xl shadow-lg shadow-slate-900/10 transition-all active:scale-[0.99] flex items-center justify-center gap-2"
             >
-              <span>Ingresar</span>
+              <span>{isSubmitting ? 'Ingresando…' : 'Ingresar'}</span>
             </button>
           </form>
 
-          {/* Creator Master Quick Login Card */}
-          {(() => {
+          {/* Creator Master Quick Login Card (solo modo demo) */}
+          {modoDemo && (() => {
             const creator = users.find(u => u.role === 'creador' || u.id === 'user-creador');
             if (!creator) return null;
             return (
@@ -279,7 +336,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             );
           })()}
 
-          {/* User selector list (requested: "debemos tener listado de usuarios y cada uno ingresar con contraseña") */}
+          {/* User selector list (solo modo demo) */}
+          {modoDemo && (
           <div className="mt-5 pt-4 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2.5">
               <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
@@ -346,6 +404,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               })}
             </div>
           </div>
+          )}
 
           {/* Portal de Clientes Button */}
           <div className="mt-4 pt-3 border-t border-slate-100 text-center">
@@ -361,7 +420,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
 
           {/* Direct Access for Street Traveling Salesmen / Preventistas */}
-          {onOpenMobileSellerApp && (
+          {modoDemo && onOpenMobileSellerApp && (
             <div className="mt-3 pt-3 border-t border-slate-100">
               <button
                 type="button"
@@ -385,7 +444,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       </div>
 
       {/* MODAL: FORGOT PASSWORD / USERS INFO */}
-      {showForgotModal && (
+      {modoDemo && showForgotModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center gap-3 pb-3 border-b border-slate-100">

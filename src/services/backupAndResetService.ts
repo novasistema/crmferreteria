@@ -7,6 +7,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { MODO_DEMO } from './appMode';
 import { 
   RawMaterial, 
   Formula, 
@@ -235,6 +236,8 @@ export async function restoreBackupPackage(pkg: BackupPackage): Promise<{ succes
   let restoredCount = 0;
 
   for (const colName of collections) {
+    // En producción los usuarios están atados a cuentas de Firebase Auth: no se restauran desde un backup
+    if (!MODO_DEMO && colName === 'app_users') continue;
     const items = pkg.data[colName] || [];
     if (!Array.isArray(items) || items.length === 0) continue;
 
