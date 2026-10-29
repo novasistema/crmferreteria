@@ -1,9 +1,163 @@
 rules_version = '2';
+
+// ============================================================================
+// REGLAS DE PRODUCCIÓN (sistema vendido a un cliente)
+//
+// - Solo el personal con usuario activo (app_users/{uid}) puede leer y escribir
+//   los datos del negocio.
+// - Solo administradores ("admin" o "creador") pueden gestionar usuarios y la
+//   configuración de la empresa. Nadie salvo el creador puede tocar al creador.
+// - Los clientes del portal solo ven SU ficha, SUS pedidos y los premios, y solo
+//   pueden canjear premios con sus propios puntos.
+// - Sin iniciar sesión solo se puede leer el logo/nombre de la empresa y saber si
+//   el sistema ya fue configurado.
+//
+// Para el deploy de DEMOSTRACIÓN usar firestore.demo.rules.
+// ============================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read, write to all collections for ERP operations
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ---------- Funciones auxiliares ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function docPath(coll, id) {
+      return /databases/$(database)/documents/$(coll)/$(id);
+    }
+    function staffProfile() {
+      return get(docPath('app_users', request.auth.uid)).data;
+    }
+    function isStaff() {
+      return signedIn()
+        && exists(docPath('app_users', request.auth.uid))
+        && staffProfile().active == true;
+    }
+    function isAdmin() {
+      return isStaff() && staffProfile().role in ['admin', 'creador'];
+    }
+    function isCreator() {
+      return isStaff() && staffProfile().role == 'creador';
+    }
+    function isPortal() {
+      return signedIn() && exists(docPath('portal_access', request.auth.uid));
+    }
+    function portalCustomerId() {
+      return get(docPath('portal_access', request.auth.uid)).data.customerId;
+    }
+    function setupDone() {
+      return exists(docPath('system', 'setup'));
+    }
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ---------- Público (pantalla de login) ----------
+    match /public_info/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---------- Configuración inicial (una sola vez) ----------
+    match /system/setup {
+      allow read: if true;
+      allow create: if signedIn()
+        && !setupDone()
+        && getAfter(docPath('app_users', request.auth.uid)).data.role == 'creador'
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---------- Usuarios del personal ----------
+    match /app_users/{uid} {
+      // Cada usuario puede leer su propio perfil (para saber si está activo)
+      allow read: if isStaff() || (signedIn() && request.auth.uid == uid);
+
+      allow create: if
+        // Alta normal: un administrador; solo el creador puede crear otro creador
+        (isAdmin() && (request.resource.data.role != 'creador' || isCreator()))
+        // Configuración inicial: el primer usuario se crea a sí mismo como creador
+        || (signedIn() && request.auth.uid == uid && !setupDone()
+            && existsAfter(docPath('system', 'setup'))
+            && request.resource.data.role == 'creador'
+            && request.resource.data.active == true);
+
+      allow update: if
+        (isAdmin()
+          && (resource.data.role != 'creador' || isCreator())
+          && (request.resource.data.role != 'creador' || isCreator())
+          && !('password' in request.resource.data))
+        // Cada usuario solo puede actualizar su fecha de último ingreso
+        || (isStaff() && request.auth.uid == uid && changedOnly(['lastLogin']));
+
+      allow delete: if isAdmin() && (resource.data.role != 'creador' || isCreator());
+    }
+
+    // ---------- Portal de clientes: credenciales ----------
+    match /portal_lookup/{taxId} {
+      allow get: if true;          // el login del portal busca su CUIT
+      allow list: if isStaff();    // nadie de afuera puede listar CUITs
+      allow write: if isStaff();
+    }
+    match /portal_access/{uid} {
+      allow read: if isStaff() || (signedIn() && request.auth.uid == uid);
+      allow write: if isStaff();
+    }
+
+    // ---------- Configuración de la empresa ----------
+    match /company_config/{docId} {
+      allow read: if isStaff() || isPortal();
+      allow write: if isAdmin();
+    }
+
+    // ---------- Datos que también usa el portal de clientes ----------
+    match /customers/{customerId} {
+      allow read: if isStaff() || (isPortal() && portalCustomerId() == customerId);
+      allow create, delete: if isStaff();
+      allow update: if isStaff()
+        // Canje de premios desde el portal: solo puede bajar sus propios puntos
+        || (isPortal() && portalCustomerId() == customerId
+            && changedOnly(['loyaltyPoints', 'loyaltyTotalRedeemed'])
+            && request.resource.data.loyaltyPoints < resource.data.loyaltyPoints
+            && request.resource.data.loyaltyPoints >= 0);
+    }
+
+    match /sales_orders/{orderId} {
+      allow read: if isStaff() || (isPortal() && resource.data.customerId == portalCustomerId());
+      allow write: if isStaff();
+    }
+
+    match /loyalty_rewards/{rewardId} {
+      allow read: if isStaff() || isPortal();
+      allow create, delete: if isStaff();
+      allow update: if isStaff()
+        || (isPortal() && changedOnly(['stock'])
+            && request.resource.data.stock == resource.data.stock - 1);
+    }
+
+    match /loyalty_redemptions/{redemptionId} {
+      allow read: if isStaff() || (isPortal() && resource.data.customerId == portalCustomerId());
+      allow create: if isStaff() || (isPortal() && request.resource.data.customerId == portalCustomerId());
+      allow update, delete: if isStaff();
+    }
+
+    match /loyalty_transactions/{txId} {
+      allow read: if isStaff() || (isPortal() && resource.data.customerId == portalCustomerId());
+      allow create: if isStaff()
+        || (isPortal() && request.resource.data.customerId == portalCustomerId()
+            && request.resource.data.type == 'canje_premio');
+      allow update, delete: if isStaff();
+    }
+
+    // ---------- Todo lo demás: solo personal activo ----------
+    match /{coll}/{docId=**} {
+      allow read, write: if isStaff() && !(coll in [
+        'system', 'app_users', 'portal_access', 'portal_lookup', 'public_info', 'company_config', 'test'
+      ]);
     }
   }
 }

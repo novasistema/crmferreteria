@@ -29,6 +29,10 @@ interface CustomerPortalProps {
   onLoginClient: (taxId: string) => void;
   onLogoutClient: () => void;
   onRedeemReward?: (customerId: string, rewardId: string) => Promise<string | null>;
+  /** Modo producción: el cliente ingresa con CUIT/DNI + código de acceso de 6 dígitos. */
+  requireAccessCode?: boolean;
+  /** Modo producción: valida CUIT + código. Devuelve un mensaje de error o null. */
+  onLoginWithCode?: (taxId: string, code: string) => Promise<string | null>;
 }
 
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({
@@ -39,9 +43,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   activeClientTaxId,
   onLoginClient,
   onLogoutClient,
-  onRedeemReward
+  onRedeemReward,
+  requireAccessCode = false,
+  onLoginWithCode
 }) => {
   const [taxIdInput, setTaxIdInput] = useState('');
+  const [accessCodeInput, setAccessCodeInput] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<'shipments' | 'invoices' | 'orders' | 'account' | 'loyalty'>('shipments');
   const [selectedOrderDoc, setSelectedOrderDoc] = useState<SalesOrder | null>(null);
@@ -55,12 +63,21 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     return cleanCust === cleanActive || c.taxId === activeClientTaxId;
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     const cleanInput = taxIdInput.replace(/[^0-9]/g, '');
     if (!cleanInput) {
       setLoginError('Por favor ingrese su número de DNI o CUIT');
+      return;
+    }
+
+    if (requireAccessCode) {
+      if (!onLoginWithCode) return;
+      setIsLoggingIn(true);
+      const err = await onLoginWithCode(cleanInput, accessCodeInput);
+      setIsLoggingIn(false);
+      if (err) setLoginError(err);
       return;
     }
 
@@ -128,6 +145,26 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             />
           </div>
 
+          {requireAccessCode && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Código de acceso
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="current-password"
+                maxLength={6}
+                placeholder="6 números"
+                value={accessCodeInput}
+                onChange={e => setAccessCodeInput(e.target.value.replace(/[^0-9]/g, ''))}
+                className="w-full text-sm p-3 rounded-xl border border-slate-300 font-mono font-bold text-slate-900 tracking-widest focus:outline-hidden focus:ring-2 focus:ring-[#d31627]"
+                required
+              />
+              <p className="text-[11px] text-slate-500 mt-1">Si no tenés código, pedíselo a la administración.</p>
+            </div>
+          )}
+
           {loginError && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
               {loginError}
@@ -136,13 +173,15 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
           <button
             type="submit"
-            className="w-full bg-[#d31627] hover:bg-red-700 text-white font-bold text-xs py-3 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2"
+            disabled={isLoggingIn}
+            className="w-full bg-[#d31627] hover:bg-red-700 disabled:opacity-60 text-white font-bold text-xs py-3 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2"
           >
-            <UserCheck className="w-4 h-4" /> Ingresar al Portal
+            <UserCheck className="w-4 h-4" /> {isLoggingIn ? 'Ingresando…' : 'Ingresar al Portal'}
           </button>
         </form>
 
-        {/* Quick demo accounts */}
+        {/* Quick demo accounts (solo modo demo) */}
+        {!requireAccessCode && (
         <div className="mt-8 pt-6 border-t border-slate-100 text-left">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
             Accesos de demostración disponibles:
@@ -164,6 +203,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             ))}
           </div>
         </div>
+        )}
       </div>
     );
   }

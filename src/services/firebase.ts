@@ -69,8 +69,25 @@ export interface FirestoreErrorInfo {
   };
 }
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Configuración de Firebase: si están definidas las variables VITE_FIREBASE_* (en Vercel),
+// se usan esas; si no, se usa firebase-applet-config.json (proyecto original de AI Studio).
+// Así el mismo código sirve para cada cliente, cada uno con su propio proyecto de Firebase.
+const env = import.meta.env;
+export const activeFirebaseConfig = env.VITE_FIREBASE_PROJECT_ID
+  ? {
+      apiKey: env.VITE_FIREBASE_API_KEY as string,
+      authDomain: (env.VITE_FIREBASE_AUTH_DOMAIN as string) || `${env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+      projectId: env.VITE_FIREBASE_PROJECT_ID as string,
+      storageBucket: (env.VITE_FIREBASE_STORAGE_BUCKET as string) || `${env.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
+      messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+      appId: env.VITE_FIREBASE_APP_ID as string,
+      // Vacío = base de datos "(default)" del proyecto
+      firestoreDatabaseId: (env.VITE_FIREBASE_DATABASE_ID as string) || '(default)'
+    }
+  : firebaseConfig;
+
+const app = initializeApp(activeFirebaseConfig);
+export const db = getFirestore(app, activeFirebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {

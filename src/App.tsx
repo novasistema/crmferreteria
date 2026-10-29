@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   collection, 
   onSnapshot, 
@@ -7,11 +7,35 @@ import {
   deleteDoc, 
   updateDoc, 
   writeBatch,
-  getDocs
+  getDocs,
+  getDoc,
+  query,
+  where
 } from 'firebase/firestore';
-import { 
-  db, 
-  testConnection, 
+import { onAuthStateChanged } from 'firebase/auth';
+import { MODO_DEMO } from './services/appMode';
+import {
+  resolveSession,
+  loginStaff,
+  logoutAndReload,
+  requestPasswordReset,
+  translateAuthError,
+  isSetupDone,
+  runInitialSetup,
+  getPublicBranding,
+  savePublicBranding,
+  createStaffUser,
+  updateStaffProfile,
+  createPortalAccess,
+  revokePortalAccess,
+  loginPortal,
+  PublicBranding
+} from './services/authService';
+import { InitialSetupScreen } from './components/InitialSetupScreen';
+import {
+  db,
+  auth,
+  testConnection,
   seedInitialDataIfEmpty, 
   handleFirestoreError, 
   OperationType,
@@ -198,13 +222,16 @@ export default function App() {
 
   const [isCreatorModuleControlOpen, setIsCreatorModuleControlOpen] = useState(false);
   const [portalClientTaxId, setPortalClientTaxId] = useState<string | null>(() => {
+    if (!MODO_DEMO) return null; // en producción lo define la sesión de Firebase Auth
     return localStorage.getItem('colorear_portal_client_tax_id');
   });
   const [preloadedProductionData, setPreloadedProductionData] = useState<{ formula?: Formula; order?: ProductionOrder } | null>(null);
 
   // App Users & Current Authenticated Staff
-  const [appUsers, setAppUsers] = useState<AppUser[]>(INITIAL_FACTORY_USERS);
+  const [appUsers, setAppUsers] = useState<AppUser[]>(MODO_DEMO ? INITIAL_FACTORY_USERS : []);
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    // En producción la sesión la maneja Firebase Auth (no se confía en localStorage)
+    if (!MODO_DEMO) return null;
     try {
       const saved = localStorage.getItem('colorear_current_user');
       return saved ? JSON.parse(saved) : null;
@@ -212,6 +239,20 @@ export default function App() {
       return null;
     }
   });
+
+  // Sesión de datos: qué se puede leer de Firestore según quién inició sesión
+  //  - 'demo': todo (modo demo)
+  //  - 'staff': personal con cuenta real (modo producción)
+  //  - 'portal': cliente del portal (solo sus propios datos)
+  //  - null: nadie logueado (modo producción) → no se carga ningún dato
+  const [dataSession, setDataSession] = useState<'demo' | 'staff' | 'portal' | null>(MODO_DEMO ? 'demo' : null);
+  const [portalCustomerId, setPortalCustomerId] = useState<string | null>(null);
+  const [authResolved, setAuthResolved] = useState(MODO_DEMO);
+  const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
+  const [publicBranding, setPublicBranding] = useState<PublicBranding | null>(null);
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
+  const [portalAccessList, setPortalAccessList] = useState<{ uid: string; customerId: string; createdAt?: string }[]>([]);
+  const setupInProgressRef = useRef(false);
 
   // State collections synced from Firestore
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
@@ -282,28 +323,150 @@ export default function App() {
     document.title = `${titleName} - CRM & ERP Industrial`;
   }, [companyConfig]);
 
-  // Initialize and attach Firestore real-time listeners
+  // MODO PRODUCCIÓN: escuchar la sesión de Firebase Auth y decidir qué ve cada usuario
   useEffect(() => {
+    if (MODO_DEMO) return;
+
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      if (setupInProgressRef.current) return; // la configuración inicial resuelve su propia sesión
+      try {
+        if (!fbUser) {
+          const [setupDone, branding] = await Promise.all([isSetupDone(), getPublicBranding()]);
+          setNeedsInitialSetup(!setupDone);
+          setPublicBranding(branding);
+          setCurrentUser(null);
+          setDataSession(null);
+          setIsLoading(false);
+          setAuthResolved(true);
+          return;
+        }
+
+        const session = await resolveSession(fbUser);
+        if (session.kind === 'staff') {
+          setNeedsInitialSetup(false);
+          setCurrentUser(session.user);
+          setDataSession('staff');
+          if (session.user.role === 'vendedor_calle') {
+            setIsMobileSellerAppOpen(true);
+          } else {
+            setActiveModule('desktop');
+          }
+        } else if (session.kind === 'portal') {
+          setPortalCustomerId(session.customerId);
+          setActiveModule('customer_portal');
+          setDataSession('portal');
+        } else {
+          setLoginNotice(session.reason);
+          await auth.signOut();
+          return; // onAuthStateChanged vuelve a dispararse con fbUser = null
+        }
+        setAuthResolved(true);
+      } catch (err) {
+        console.error('Error resolviendo la sesión:', err);
+        setLoginNotice('No se pudo verificar tu acceso. Revisá la conexión e intentá de nuevo.');
+        setIsLoading(false);
+        setAuthResolved(true);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Vendedor de calle: vincular su ficha de vendedor cuando se cargan los vendedores
+  useEffect(() => {
+    if (MODO_DEMO || !currentUser || currentUser.role !== 'vendedor_calle' || activeSellerContext) return;
+    const matchSeller = sellers.find(s =>
+      (s.email && s.email.toLowerCase() === currentUser.email.toLowerCase()) ||
+      s.name.toLowerCase().includes(currentUser.name.toLowerCase())
+    );
+    if (matchSeller) setActiveSellerContext(matchSeller);
+  }, [sellers, currentUser, activeSellerContext]);
+
+  // MODO PRODUCCIÓN: mantener actualizado el logo/nombre que se ve en la pantalla de login
+  useEffect(() => {
+    if (MODO_DEMO || !companyConfig || dataSession !== 'staff') return;
+    if (currentUser?.role !== 'admin' && currentUser?.role !== 'creador') return;
+    const sameBranding =
+      publicBranding &&
+      publicBranding.companyName === (companyConfig.companyName || '') &&
+      publicBranding.tradeName === (companyConfig.tradeName || '') &&
+      publicBranding.logoUrl === (companyConfig.logoUrl || '') &&
+      publicBranding.address === (companyConfig.plantAddress || companyConfig.fiscalAddress || '');
+    if (sameBranding) return;
+    savePublicBranding(companyConfig)
+      .then(() => setPublicBranding({
+        companyName: companyConfig.companyName || '',
+        tradeName: companyConfig.tradeName || '',
+        logoUrl: companyConfig.logoUrl || '',
+        address: companyConfig.plantAddress || companyConfig.fiscalAddress || ''
+      }))
+      .catch(err => console.warn('No se pudo actualizar la marca pública:', err));
+  }, [companyConfig, dataSession, currentUser, publicBranding]);
+
+  // MODO PRODUCCIÓN, portal de clientes: cargar SOLO los datos del cliente logueado
+  useEffect(() => {
+    if (dataSession !== 'portal' || !portalCustomerId) return;
+    const unsubs: (() => void)[] = [];
+
+    unsubs.push(onSnapshot(doc(db, 'customers', portalCustomerId), snap => {
+      if (snap.exists()) {
+        const cust = { id: snap.id, ...snap.data() } as Customer;
+        setCustomers([cust]);
+        setPortalClientTaxId(cust.taxId);
+      }
+      setIsLoading(false);
+    }, err => {
+      console.error('Portal: no se pudo leer el cliente', err);
+      setIsLoading(false);
+    }));
+
+    unsubs.push(onSnapshot(query(collection(db, 'sales_orders'), where('customerId', '==', portalCustomerId)), snap => {
+      setSalesOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as SalesOrder)));
+    }, err => console.warn('Portal: no se pudieron leer los pedidos', err)));
+
+    unsubs.push(onSnapshot(collection(db, 'loyalty_rewards'), snap => {
+      setLoyaltyRewards(snap.docs.map(d => ({ id: d.id, ...d.data() } as LoyaltyReward)));
+    }, err => console.warn('Portal: no se pudieron leer los premios', err)));
+
+    getDoc(doc(db, 'company_config', 'main_config'))
+      .then(snap => { if (snap.exists()) setCompanyConfig(snap.data() as CompanyConfig); })
+      .catch(err => console.warn('Portal: no se pudo leer la configuración', err));
+
+    return () => unsubs.forEach(u => u());
+  }, [dataSession, portalCustomerId]);
+
+  // Initialize and attach Firestore real-time listeners (modo demo y personal logueado)
+  useEffect(() => {
+    if (dataSession !== 'demo' && dataSession !== 'staff') return;
     let unsubscribes: (() => void)[] = [];
 
     const initializeApp = async () => {
       try {
-        await testConnection();
-        await seedInitialDataIfEmpty();
-        await seedUsersIfEmpty();
-        await seedFinanceAndStaffIfEmpty();
-        await seedSellersIfEmpty();
-        await seedLoyaltyAndInstallmentsIfEmpty();
-        await seedQuotesAndRemitosIfEmpty();
+        if (dataSession === 'demo') {
+          // Solo en modo demo: login anónimo + datos de ejemplo
+          await testConnection();
+          await seedInitialDataIfEmpty();
+          await seedUsersIfEmpty();
+          await seedFinanceAndStaffIfEmpty();
+          await seedSellersIfEmpty();
+          await seedLoyaltyAndInstallmentsIfEmpty();
+          await seedQuotesAndRemitosIfEmpty();
 
-        // Check if official August 2026 catalog with SKUs needs to be synchronized
-        try {
-          const prodSnap = await getDocs(collection(db, 'products'));
-          if (prodSnap.size < 50) {
-            await syncOfficialAugust2026PriceList();
+          // Check if official August 2026 catalog with SKUs needs to be synchronized
+          try {
+            const prodSnap = await getDocs(collection(db, 'products'));
+            if (prodSnap.size < 50) {
+              await syncOfficialAugust2026PriceList();
+            }
+          } catch (prodErr) {
+            console.warn("Catalog synchronization deferred:", prodErr);
           }
-        } catch (prodErr) {
-          console.warn("Catalog synchronization deferred:", prodErr);
+        } else {
+          setIsLoading(true);
+          // Accesos al portal de clientes (para el módulo Usuarios)
+          const unsubPortal = onSnapshot(collection(db, 'portal_access'), snap => {
+            setPortalAccessList(snap.docs.map(d => ({ uid: d.id, customerId: d.data().customerId, createdAt: d.data().createdAt })));
+          }, error => console.warn('No se pudieron leer los accesos al portal:', error));
+          unsubscribes.push(unsubPortal);
         }
 
         // 1. Raw Materials
@@ -600,7 +763,7 @@ export default function App() {
     return () => {
       unsubscribes.forEach(unsub => unsub());
     };
-  }, []);
+  }, [dataSession]);
 
   // Auto-redirect if active seller persona cannot access current module
   useEffect(() => {
@@ -1270,7 +1433,20 @@ export default function App() {
     setActiveModule('customer_portal');
   };
 
+  const handlePortalLogin = async (taxId: string, code: string): Promise<string | null> => {
+    try {
+      return await loginPortal(taxId, code); // onAuthStateChanged carga los datos del cliente
+    } catch (err) {
+      console.error('Error en login del portal:', err);
+      return 'No se pudo ingresar. Intentá de nuevo en unos minutos.';
+    }
+  };
+
   const handleLogoutClient = () => {
+    if (!MODO_DEMO) {
+      logoutAndReload();
+      return;
+    }
     setPortalClientTaxId(null);
     localStorage.removeItem('colorear_portal_client_tax_id');
   };
@@ -1601,7 +1777,58 @@ export default function App() {
     }
   };
 
+  // --- MODO PRODUCCIÓN: login real con Firebase Auth ---
+  const handlePasswordLogin = async (email: string, password: string): Promise<string | null> => {
+    setLoginNotice(null);
+    try {
+      await loginStaff(email, password);
+      return null; // onAuthStateChanged se encarga del resto
+    } catch (err) {
+      return translateAuthError(err);
+    }
+  };
+
+  const handleForgotPassword = async (email: string): Promise<string | null> => {
+    try {
+      await requestPasswordReset(email);
+      return null;
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      // No revelar si el email existe o no
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') return null;
+      return translateAuthError(err);
+    }
+  };
+
+  const handleInitialSetup = async (params: { name: string; email: string; password: string; companyName: string }): Promise<string | null> => {
+    try {
+      // Se marca antes para que el listener de sesión no intente resolver un usuario a medio crear
+      setupInProgressRef.current = true;
+      await runInitialSetup(params);
+      const session = auth.currentUser ? await resolveSession(auth.currentUser) : null;
+      if (session && session.kind === 'staff') {
+        setNeedsInitialSetup(false);
+        setCurrentUser(session.user);
+        setDataSession('staff');
+        setActiveModule('desktop');
+        setAuthResolved(true);
+      }
+      return null;
+    } catch (err) {
+      const code = (err as { code?: string })?.code || '';
+      if (code.startsWith('auth/')) return translateAuthError(err);
+      console.error('Error en la configuración inicial:', err);
+      return 'No se pudo completar la configuración. Revisá que las reglas de Firestore estén publicadas.';
+    } finally {
+      setupInProgressRef.current = false;
+    }
+  };
+
   const handleLogout = () => {
+    if (!MODO_DEMO) {
+      logoutAndReload();
+      return;
+    }
     setCurrentUser(null);
     setIsMobileSellerAppOpen(false);
     localStorage.removeItem('colorear_current_user');
@@ -1669,8 +1896,16 @@ export default function App() {
     );
   }
 
+  // MODO PRODUCCIÓN: instalación nueva, todavía no hay ningún usuario
+  if (!MODO_DEMO && needsInitialSetup && !currentUser) {
+    return <InitialSetupScreen onSetup={handleInitialSetup} />;
+  }
+
+  // MODO PRODUCCIÓN: la app de preventistas solo se abre con un usuario logueado
+  const canOpenMobileSellerApp = MODO_DEMO || !!currentUser;
+
   // Dedicated Mobile App for Street Traveling Salesmen (Preventistas / Vendedores de Calle)
-  if (isMobileSellerAppOpen) {
+  if (isMobileSellerAppOpen && canOpenMobileSellerApp) {
     return (
       <MobileSellerApp
         sellers={sellers}
@@ -1715,7 +1950,13 @@ export default function App() {
               <span>Portal Oficial de Clientes & Pinturerías</span>
             </div>
             <button
-              onClick={() => setActiveModule('desktop')}
+              onClick={() => {
+                if (!MODO_DEMO && dataSession === 'portal') {
+                  logoutAndReload();
+                  return;
+                }
+                setActiveModule('desktop');
+              }}
               className="text-slate-300 hover:text-white flex items-center gap-1 font-bold underline"
             >
               ← Volver al Acceso de Personal de Fábrica
@@ -1730,18 +1971,36 @@ export default function App() {
             onLoginClient={handleLoginClient}
             onLogoutClient={handleLogoutClient}
             onRedeemReward={handleRedeemLoyaltyReward}
+            requireAccessCode={!MODO_DEMO}
+            onLoginWithCode={handlePortalLogin}
           />
         </div>
       );
     }
 
+    // En producción, antes de iniciar sesión solo se conoce la marca pública (logo y nombre)
+    const loginConfig: CompanyConfig | null = MODO_DEMO
+      ? companyConfig
+      : publicBranding
+        ? ({
+            companyName: publicBranding.companyName,
+            tradeName: publicBranding.tradeName,
+            logoUrl: publicBranding.logoUrl || undefined,
+            plantAddress: publicBranding.address
+          } as CompanyConfig)
+        : null;
+
     return (
       <LoginScreen
-        users={appUsers}
+        users={MODO_DEMO ? appUsers : []}
         onLogin={handleLogin}
         onOpenCustomerPortal={() => setActiveModule('customer_portal')}
-        onOpenMobileSellerApp={() => setIsMobileSellerAppOpen(true)}
-        config={companyConfig}
+        onOpenMobileSellerApp={MODO_DEMO ? () => setIsMobileSellerAppOpen(true) : undefined}
+        config={loginConfig}
+        modoDemo={MODO_DEMO}
+        onPasswordLogin={handlePasswordLogin}
+        onForgotPassword={handleForgotPassword}
+        initialError={loginNotice}
       />
     );
   }
@@ -2474,12 +2733,33 @@ export default function App() {
             <UsersModule
               users={appUsers}
               currentUser={currentUser}
+              modoDemo={MODO_DEMO}
               onSaveUser={async (user) => {
-                await setDoc(doc(db, 'app_users', user.id), user);
+                if (MODO_DEMO) {
+                  await setDoc(doc(db, 'app_users', user.id), user);
+                } else {
+                  await updateStaffProfile(user);
+                }
+              }}
+              onCreateUser={MODO_DEMO ? undefined : async (params) => {
+                await createStaffUser(params);
+              }}
+              onSendPasswordReset={MODO_DEMO ? undefined : async (email) => {
+                await requestPasswordReset(email);
               }}
               onDeleteUser={async (id) => {
-                await deleteDoc(doc(db, 'app_users', id));
+                if (MODO_DEMO) {
+                  await deleteDoc(doc(db, 'app_users', id));
+                } else {
+                  // En producción se desactiva (la cuenta de acceso queda bloqueada por las reglas)
+                  const u = appUsers.find(x => x.id === id);
+                  if (u) await updateStaffProfile({ ...u, active: false });
+                }
               }}
+              customers={customers}
+              portalAccessList={portalAccessList}
+              onCreatePortalAccess={MODO_DEMO ? undefined : createPortalAccess}
+              onRevokePortalAccess={MODO_DEMO ? undefined : revokePortalAccess}
             />
           )}
               </>
