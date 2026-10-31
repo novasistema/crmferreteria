@@ -35,7 +35,8 @@ import {
   Hammer,
   PaintBucket,
   Lock,
-  KeyRound
+  KeyRound,
+  Receipt as ReceiptIcon
 } from 'lucide-react';
 import { ModuleKey } from '../types';
 
@@ -48,6 +49,8 @@ interface CreatorModuleControlModalProps {
   onNavigateToModule?: (moduleKey: ModuleKey) => void;
   onChangePassword?: () => void;
   onLock?: () => void;
+  onOpenArcaSetup?: () => void;
+  arcaReady?: boolean;
 }
 
 interface ModuleMeta {
@@ -280,7 +283,9 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
   onBatchToggleModules,
   onNavigateToModule,
   onChangePassword,
-  onLock
+  onLock,
+  onOpenArcaSetup,
+  arcaReady
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -456,6 +461,15 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {onOpenArcaSetup && (
+                <button
+                  onClick={onOpenArcaSetup}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${arcaReady ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200' : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'}`}
+                  title="Configurar facturación electrónica ARCA"
+                >
+                  <ReceiptIcon className="w-4 h-4" /> ARCA {arcaReady ? '✓' : '!'}
+                </button>
+              )}
               {onChangePassword && (
                 <button
                   onClick={onChangePassword}

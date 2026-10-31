@@ -71,6 +71,10 @@ export const ArcaFiscalModule: React.FC<ArcaFiscalModuleProps> = ({
     return { totalAuthorizedAmount, totalIvaAmount, authorizedCount, pendingCount };
   }, [vouchers, pendingOrders]);
 
+  const lastTest = config?.arcaLastTest;
+  const arcaReady = !!(lastTest?.ok && config?.arcaCertPem && config?.arcaKeyEnc && lastTest.env === config?.arcaEnvironment && lastTest.pointOfSale === config?.arcaPointOfSale);
+  const lastCae = [...vouchers].filter(v => v.cae).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))[0]?.cae;
+
   // Handle manual authorization
   const handleAuthorizeOrder = async (order: SalesOrder) => {
     setIsAuthorizingId(order.id);
@@ -78,9 +82,9 @@ export const ArcaFiscalModule: React.FC<ArcaFiscalModuleProps> = ({
       const ptoVta = config?.arcaPointOfSale || 4;
       const type = order.invoiceType || (order.customerTaxId?.startsWith('30') ? 'FACTURA_A' : 'FACTURA_B');
       await onAuthorizeOrderManually(order.id, ptoVta, type);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error authorizing ARCA invoice:", err);
-      alert("Error al conectar con los servidores fiscales de ARCA WSFE.");
+      alert(err?.message || "No se pudo autorizar la factura en ARCA.");
     } finally {
       setIsAuthorizingId(null);
     }
@@ -106,14 +110,19 @@ export const ArcaFiscalModule: React.FC<ArcaFiscalModuleProps> = ({
               </span>
             </h2>
             <p className="text-sm text-slate-400">
-              Punto de Venta {config?.arcaPointOfSale || 4} - Emisión de Facturas A/B, CAE oficial, QR de verificación y envío inmediato.
+              Punto de Venta {config?.arcaPointOfSale || '—'} · {config?.arcaTaxCondition === 'monotributo' || config?.arcaTaxCondition === 'exento' ? 'Factura C' : 'Facturas A y B'} con CAE y QR oficial.
             </p>
+            {!arcaReady && (
+              <p className="mt-2 text-xs font-bold text-amber-300">
+                ⚠ Facturación no habilitada todavía: el creador tiene que configurarla en Control Maestro → ARCA.
+              </p>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400 font-mono">
-            CUIT Empresa: <strong className="text-white">{config?.cuit || '30-71122334-4'}</strong>
+            CUIT Empresa: <strong className="text-white">{config?.cuit || 'sin configurar'}</strong>
           </span>
         </div>
       </div>
@@ -401,16 +410,20 @@ export const ArcaFiscalModule: React.FC<ArcaFiscalModuleProps> = ({
 
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-400">Servidores ARCA / AFIP:</span>
-                <span className="text-emerald-400 font-bold">En Línea (Normal)</span>
+                <span className="text-slate-400">Conexión con ARCA:</span>
+                <span className={`font-bold ${arcaReady ? 'text-emerald-400' : 'text-amber-400'}`}>{arcaReady ? 'Configurada y probada' : 'Sin configurar'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Último CAE Autorizado:</span>
-                <span className="text-white font-mono">74429103849182</span>
+                <span className="text-slate-400">Última prueba:</span>
+                <span className="text-white font-mono">{lastTest ? new Date(lastTest.at).toLocaleString('es-AR') : '—'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">QR Oficial RG 4291:</span>
-                <span className="text-emerald-400 font-bold">Habilitado</span>
+                <span className="text-slate-400">Último CAE emitido:</span>
+                <span className="text-white font-mono">{lastCae || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Certificado vence:</span>
+                <span className="text-white font-mono">{config?.arcaCertNotAfter ? new Date(config.arcaCertNotAfter).toLocaleDateString('es-AR') : '—'}</span>
               </div>
             </div>
           </div>

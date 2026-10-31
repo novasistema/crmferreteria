@@ -7,7 +7,8 @@ import {
   deleteDoc, 
   updateDoc, 
   writeBatch,
-  getDocs
+  getDocs,
+  deleteField
 } from 'firebase/firestore';
 import { 
   db, 
@@ -45,6 +46,7 @@ import {
   InventoryMovement, 
   NotificationItem, 
   CompanyConfig, 
+  TaxCategory,
   ModuleKey, 
   SalesOrderStatus,
   AppUser,
@@ -102,6 +104,8 @@ import { ArcaFiscalModule } from './components/ArcaFiscalModule';
 import { SystemAssistantModule } from './components/SystemAssistantModule';
 import { CreatorModuleControlModal } from './components/CreatorModuleControlModal';
 import { CreatorPanelLock, CreatorLockMode, hashCreatorPassword, generateSalt } from './components/CreatorPanelLock';
+import { ArcaSetupWizard } from './components/ArcaSetupWizard';
+import { callArca } from './services/arcaClient';
 import { TabsBar, TabItem } from './components/TabsBar';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { exportPriceListToExcel } from './utils/exportUtils';
@@ -206,6 +210,7 @@ export default function App() {
   // El Control Maestro pide contraseña cada vez que se abre
   const [creatorPanelUnlocked, setCreatorPanelUnlocked] = useState(false);
   const [creatorLockMode, setCreatorLockMode] = useState<CreatorLockMode | null>(null);
+  const [isArcaSetupOpen, setIsArcaSetupOpen] = useState(false);
   const [portalClientTaxId, setPortalClientTaxId] = useState<string | null>(() => {
     return localStorage.getItem('colorear_portal_client_tax_id');
   });
@@ -1580,52 +1585,102 @@ export default function App() {
   };
 
   // --- ARCA AUTHORIZATION HANDLER ---
-  const handleAuthorizeOrderManually = async (orderId: string, pointOfSale: number, invoiceType: string): Promise<ArcaElectronicVoucher> => {
+  // Emite la factura electrónica real en ARCA (WSFEv1) a través del servidor /api/arca
+  const handleAuthorizeOrderManually = async (orderId: string, _pointOfSale: number, _invoiceType: string): Promise<ArcaElectronicVoucher> => {
     const order = salesOrders.find(o => o.id === orderId);
-    if (!order) throw new Error("Orden no encontrada");
+    if (!order) throw new Error('Pedido no encontrado.');
+    const cfg = companyConfig;
+    if (!cfg || !isArcaReady(cfg)) {
+      throw new Error('La facturación ARCA no está configurada o la última prueba de conexión falló. El creador tiene que completarla en Control Maestro → ARCA.');
+    }
+    if (order.cae) throw new Error(`Este pedido ya tiene CAE ${order.cae}.`);
 
-    const ptoVta = pointOfSale || 4;
-    const vNumber = `${String(ptoVta).padStart(4, '0')}-${String(Math.floor(Math.random() * 89999 + 10000)).padStart(8, '0')}`;
-    const generatedCae = `74${Date.now().toString().slice(-12)}`;
-    const dueCae = new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0];
-    const todayStr = new Date().toISOString().split('T')[0];
+    const customer = customers.find(c => c.id === order.customerId);
+    const receptorCategory: TaxCategory = customer?.taxCategory || 'consumidor_final';
+    const docDigits = (order.customerTaxId || customer?.taxId || '').replace(/\D/g, '');
+    const emitterIsRI = (cfg.arcaTaxCondition || 'responsable_inscripto') === 'responsable_inscripto';
 
+    // Tipo de comprobante: RI → A a inscriptos y monotributistas, B al resto; monotributo/exento → C
+    const letter: 'A' | 'B' | 'C' = !emitterIsRI
+      ? 'C'
+      : receptorCategory === 'responsable_inscripto' || receptorCategory === 'monotributo' ? 'A' : 'B';
+    const cbteTipo = { A: 1, B: 6, C: 11 }[letter];
+
+    let docTipo = 99;
+    let docNro = '0';
+    if (docDigits.length === 11) { docTipo = 80; docNro = docDigits; }
+    else if (docDigits.length >= 7 && docDigits.length <= 8) { docTipo = 96; docNro = docDigits; }
+    if (letter === 'A' && docTipo !== 80) {
+      throw new Error(`Para Factura A el cliente "${order.customerName}" necesita un CUIT válido de 11 dígitos.`);
+    }
+    const condicionIvaReceptorId = ({ responsable_inscripto: 1, monotributo: 6, exento: 4, consumidor_final: 5 } as const)[receptorCategory];
+
+    // El total del pedido es el precio final con IVA 21 % incluido
+    const total = Math.round(order.total * 100) / 100;
+    if (!(total > 0)) throw new Error('El pedido no tiene importe para facturar.');
+    const neto = letter === 'C' ? total : Math.round((total / 1.21) * 100) / 100;
+    const iva = letter === 'C' ? 0 : Math.round((total - neto) * 100) / 100;
+
+    const r = await callArca('invoice', {
+      env: cfg.arcaEnvironment,
+      cuit: cfg.cuit,
+      keyEnc: cfg.arcaKeyEnc,
+      certPem: cfg.arcaCertPem,
+      taEnc: cfg.arcaTaEnc,
+      invoice: {
+        ptoVta: cfg.arcaPointOfSale,
+        cbteTipo,
+        docTipo,
+        docNro,
+        condicionIvaReceptorId,
+        impTotal: total,
+        impNeto: neto,
+        impIva: iva,
+        iva: letter === 'C' ? [] : [{ id: 5, baseImp: neto, importe: iva }]
+      }
+    });
+    if (r.taEnc && r.taEnc !== cfg.arcaTaEnc) {
+      setDoc(doc(db, 'company_config', 'main_config'), { arcaTaEnc: r.taEnc }, { merge: true }).catch(() => {});
+      setCompanyConfig(prev => prev ? { ...prev, arcaTaEnc: r.taEnc } : prev);
+    }
+    if (!r.ok) throw new Error(r.error || 'ARCA rechazó la factura.');
+
+    const vNumber = `${String(cfg.arcaPointOfSale).padStart(5, '0')}-${String(r.number).padStart(8, '0')}`;
     const qrData = {
       ver: 1,
-      fecha: todayStr,
-      cuit: parseInt(order.customerTaxId?.replace(/[^0-9]/g, '') || '30711223344'),
-      ptoVta: ptoVta,
-      tipoCmp: invoiceType === 'FACTURA_A' ? 1 : 6,
-      nroCmp: parseInt(vNumber.split('-')[1]),
-      importe: order.total,
+      fecha: r.date,
+      cuit: Number(cfg.cuit.replace(/\D/g, '')),
+      ptoVta: cfg.arcaPointOfSale,
+      tipoCmp: cbteTipo,
+      nroCmp: r.number,
+      importe: total,
       moneda: 'PES',
       ctz: 1,
-      tipoDocRec: 80,
-      nroDocRec: parseInt(order.customerTaxId?.replace(/[^0-9]/g, '') || '0'),
-      tipoCodigoAutorizacion: 'A',
-      codigoAutorizacion: parseInt(generatedCae)
+      tipoDocRec: docTipo,
+      nroDocRec: Number(docNro),
+      tipoCodAut: 'E',
+      codAut: Number(r.cae)
     };
-    const b64 = btoa(JSON.stringify(qrData));
-    const afipQrUrl = `https://www.afip.gob.ar/fe/qr/?p=${b64}`;
+    const afipQrUrl = `https://www.afip.gob.ar/fe/qr/?p=${btoa(JSON.stringify(qrData))}`;
 
     const newVoucher: ArcaElectronicVoucher = {
       id: `arc-${Date.now()}`,
       voucherNumber: vNumber,
-      voucherType: invoiceType as any || 'FACTURA_A',
-      pointOfSale: ptoVta,
-      date: todayStr,
+      voucherType: `FACTURA_${letter}`,
+      pointOfSale: cfg.arcaPointOfSale,
+      date: r.date,
       customerId: order.customerId,
       customerName: order.customerName,
-      customerTaxId: order.customerTaxId,
-      taxCategory: 'responsable_inscripto',
-      netAmount: Math.round(order.total / 1.21),
-      iva21: Math.round(order.total - order.total / 1.21),
-      total: order.total,
-      cae: generatedCae,
-      caeVto: dueCae,
+      customerTaxId: docNro === '0' ? '' : docNro,
+      taxCategory: receptorCategory,
+      netAmount: neto,
+      iva21: iva,
+      total,
+      cae: r.cae,
+      caeVto: r.caeVto,
       afipQrUrl,
       status: 'autorizado',
-      environment: companyConfig?.arcaEnvironment || 'homologacion',
+      environment: cfg.arcaEnvironment,
       associatedOrderId: order.id,
       createdAt: new Date().toISOString()
     };
@@ -1634,12 +1689,12 @@ export default function App() {
     batch.set(doc(db, 'arca_vouchers', newVoucher.id), newVoucher);
     batch.update(doc(db, 'sales_orders', order.id), {
       status: 'facturado',
-      cae: generatedCae,
-      caeVto: dueCae,
-      invoiceNumber: vNumber
+      cae: r.cae,
+      caeVto: r.caeVto,
+      invoiceNumber: vNumber,
+      invoiceType: `FACTURA_${letter}`
     });
     await batch.commit();
-
     return newVoucher;
   };
 
@@ -1668,6 +1723,7 @@ export default function App() {
   };
 
   const closeCreatorModuleControl = () => {
+    setIsArcaSetupOpen(false);
     setIsCreatorModuleControlOpen(false);
     setCreatorPanelUnlocked(false);
     setCreatorLockMode(null);
@@ -1690,6 +1746,23 @@ export default function App() {
     }, { merge: true });
     setCompanyConfig(prev => prev ? { ...prev, creatorPanelPasswordHash: hash, creatorPanelPasswordSalt: salt } : prev);
   };
+
+  // Guarda la configuración ARCA (solo creador con el panel desbloqueado)
+  const saveArcaConfig = async (patch: Partial<CompanyConfig>) => {
+    if (currentUser?.role !== 'creador' || !creatorPanelUnlocked) return;
+    const toWrite: Record<string, unknown> = {};
+    Object.entries(patch).forEach(([k, v]) => { toWrite[k] = v === undefined ? deleteField() : v; });
+    await setDoc(doc(db, 'company_config', 'main_config'), toWrite, { merge: true });
+    setCompanyConfig(prev => {
+      if (!prev) return prev;
+      const next: any = { ...prev, ...patch };
+      Object.entries(patch).forEach(([k, v]) => { if (v === undefined) delete next[k]; });
+      return next;
+    });
+  };
+
+  const isArcaReady = (cfg?: CompanyConfig | null) =>
+    !!(cfg?.arcaLastTest?.ok && cfg.arcaCertPem && cfg.arcaKeyEnc && cfg.arcaLastTest.env === cfg.arcaEnvironment && cfg.arcaLastTest.pointOfSale === cfg.arcaPointOfSale);
 
   const canEditModules = () => currentUser?.role === 'creador' && creatorPanelUnlocked;
 
@@ -2629,11 +2702,21 @@ export default function App() {
         />
       )}
 
+      {isArcaSetupOpen && isCreatorModuleControlOpen && currentUser?.role === 'creador' && creatorPanelUnlocked && (
+        <ArcaSetupWizard
+          config={companyConfig}
+          onSave={saveArcaConfig}
+          onClose={() => setIsArcaSetupOpen(false)}
+        />
+      )}
+
       <CreatorModuleControlModal
         isOpen={isCreatorModuleControlOpen && currentUser?.role === 'creador' && creatorPanelUnlocked && !creatorLockMode}
         onClose={closeCreatorModuleControl}
         onLock={closeCreatorModuleControl}
         onChangePassword={() => setCreatorLockMode('change')}
+        onOpenArcaSetup={() => setIsArcaSetupOpen(true)}
+        arcaReady={isArcaReady(companyConfig)}
         systemModuleToggles={companyConfig?.systemModuleToggles}
         onToggleModule={handleToggleSystemModule}
         onBatchToggleModules={handleBatchToggleSystemModules}

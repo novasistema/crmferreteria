@@ -500,6 +500,24 @@ export interface CompanyConfig {
   systemModuleToggles?: Partial<Record<ModuleKey, boolean>>; // Control Maestro de Módulos del Creador
   creatorPanelPasswordHash?: string; // SHA-256 de la contraseña del Control Maestro
   creatorPanelPasswordSalt?: string;
+  // --- Facturación electrónica ARCA (configura el creador) ---
+  arcaTaxCondition?: 'responsable_inscripto' | 'monotributo' | 'exento';
+  arcaAlias?: string;
+  arcaKeyEnc?: string; // clave privada cifrada en el servidor (nunca en claro)
+  arcaCsrPem?: string; // pedido de certificado para subir a ARCA
+  arcaCertPem?: string; // certificado .crt devuelto por ARCA
+  arcaCertNotAfter?: string;
+  arcaTaEnc?: string; // ticket de acceso vigente, cifrado
+  arcaLastTest?: ArcaConnectionTest;
+}
+
+export interface ArcaConnectionTest {
+  ok: boolean;
+  at: string;
+  env: 'homologacion' | 'produccion';
+  pointOfSale: number;
+  checks: { step: string; ok: boolean; detail: string }[];
+  error?: string;
 }
 
 export type ModuleKey = 

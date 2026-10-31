@@ -9,7 +9,7 @@ import {
   setDoc,
   writeBatch
 } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import defaultFirebaseConfig from '../../firebase-applet-config.json';
 import { generateColorearProducts } from './colorearPriceListData';
 import { 
   RawMaterial, 
@@ -68,6 +68,22 @@ export interface FirestoreErrorInfo {
     }[];
   };
 }
+
+// Cada cliente puede tener su propia base: si el proyecto de Vercel define VITE_FIREBASE_*,
+// se usan esas variables; si no, la configuración de demo incluida en el repositorio.
+const env = (import.meta as any).env || {};
+const firebaseConfig = env.VITE_FIREBASE_PROJECT_ID
+  ? {
+      ...defaultFirebaseConfig,
+      apiKey: env.VITE_FIREBASE_API_KEY,
+      authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || `${env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+      projectId: env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || `${env.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
+      messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+      appId: env.VITE_FIREBASE_APP_ID || '',
+      firestoreDatabaseId: env.VITE_FIREBASE_DATABASE_ID || '(default)'
+    }
+  : defaultFirebaseConfig;
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
