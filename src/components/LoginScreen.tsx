@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   Eye, 
   EyeOff, 
@@ -36,6 +36,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [emailOrUser, setEmailOrUser] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [selectedUserForForgot, setSelectedUserForForgot] = useState<AppUser | null>(null);
@@ -72,10 +73,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    // Validate password (or accept default role password for ease of access)
-    const validPassword = found.password || '1234';
-    if (password !== validPassword && password !== 'admin' && password !== '1234' && password !== 'colorear2026') {
-      setError(`Contraseña incorrecta. (Pista de prueba para ${found.name}: "${validPassword}")`);
+    // La contraseña tiene que coincidir exactamente con la del usuario (sin claves maestras)
+    if (!found.password) {
+      setError('Este usuario no tiene contraseña asignada. Pedile al administrador que le asigne una desde Usuarios.');
+      return;
+    }
+    if (password !== found.password) {
+      setError('Contraseña incorrecta.');
+      setPassword('');
       return;
     }
 
@@ -83,10 +88,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     onLogin(found);
   };
 
+  // Elegir un usuario de la lista solo completa el usuario: la contraseña siempre se escribe
   const handleSelectUser = (u: AppUser) => {
     setEmailOrUser(u.email);
-    setPassword(u.password || 'admin');
+    setPassword('');
     setError(null);
+    setTimeout(() => passwordInputRef.current?.focus(), 0);
   };
 
   const brandLogo = config?.logoUrl || '/assets/aistudio/colorear-500px_0158e3cb.webp';
@@ -210,6 +217,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
               <div className="relative">
                 <input 
+                  ref={passwordInputRef}
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
@@ -263,7 +271,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       <span>{creator.name}</span>
                     </div>
                     <div className="text-[10px] text-indigo-300 font-mono truncate">
-                      {creator.email} (clave: {creator.password})
+                      {creator.email}
                     </div>
                   </div>
                   <button
@@ -272,7 +280,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black transition-all active:scale-95 shadow-xs shrink-0 flex items-center gap-1 border border-indigo-400/30"
                   >
                     <Sliders className="w-3.5 h-3.5" />
-                    <span>Ingresar</span>
+                    <span>Seleccionar</span>
                   </button>
                 </div>
               </div>
@@ -284,7 +292,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <div className="flex items-center justify-between mb-2.5">
               <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-slate-400" />
-                Listado de Usuarios (1 Clic)
+                Elegí tu usuario y escribí tu contraseña
               </span>
               <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full">
                 {users.length} Registrados
@@ -331,14 +339,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     </div>
 
                     <div className="text-right shrink-0 ml-2">
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                         isSelected 
                           ? 'bg-white/20 text-white' 
-                          : isCreator
-                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                            : 'bg-white text-slate-600 border border-slate-200'
+                          : 'text-slate-400'
                       }`}>
-                        clave: {u.password || 'admin'}
+                        {isSelected ? '🔒 Ingresá la clave' : 'Elegir'}
                       </span>
                     </div>
                   </button>
@@ -397,23 +403,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   Acceso & Credenciales de Usuarios
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Contraseñas asignadas para el personal de fábrica
+                  Cómo recuperar el acceso
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 space-y-2 max-h-64 overflow-y-auto pr-1">
-              {users.map(u => (
-                <div key={u.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
-                  <div>
-                    <strong className="text-slate-900 block">{u.name}</strong>
-                    <span className="text-[11px] text-slate-500">{u.email} ({u.roleLabel})</span>
-                  </div>
-                  <div className="font-mono bg-white px-2.5 py-1 rounded-lg border border-slate-200 font-bold text-slate-800">
-                    {u.password || 'admin'}
-                  </div>
-                </div>
-              ))}
+            <div className="mt-4 text-xs text-slate-600 space-y-2">
+              <p>Por seguridad, las contraseñas no se muestran en esta pantalla.</p>
+              <p>Si olvidaste tu contraseña, pedile al <strong>administrador</strong> o al <strong>creador del sistema</strong> que te asigne una nueva desde el módulo <strong>Usuarios</strong>.</p>
             </div>
 
             <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">

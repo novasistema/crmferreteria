@@ -76,13 +76,18 @@ export const UsersModule: React.FC<UsersModuleProps> = ({
 
     const roleMeta = roleOptions.find(r => r.role === form.role) || roleOptions[0];
 
+    if (!form.password || form.password.length < 4) {
+      alert('Asigná una contraseña de al menos 4 caracteres para este usuario.');
+      return;
+    }
+
     const userToSave: AppUser = {
       id: form.id || `user-${Date.now()}`,
       name: form.name,
       email: form.email.toLowerCase().trim(),
       role: form.role as UserRole,
       roleLabel: roleMeta.label,
-      password: form.password || '1234',
+      password: form.password,
       phone: form.phone || '',
       avatarColor: roleMeta.color,
       active: form.active ?? true,
@@ -226,7 +231,7 @@ export const UsersModule: React.FC<UsersModuleProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Contraseña:</span>
                     <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 font-bold text-slate-800">
-                      {user.password || 'admin'}
+                      {user.password ? '••••••' : 'Sin asignar'}
                     </span>
                   </div>
                   {user.phone && (
