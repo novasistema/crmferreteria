@@ -1,22 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Store, 
-  ChevronDown, 
-  Search, 
-  Bell, 
-  LogOut, 
-  UserCheck, 
-  Sliders, 
-  Crown, 
-  Compass, 
-  CheckCircle2, 
-  AlertTriangle, 
-  DollarSign, 
-  Boxes, 
-  Truck, 
-  User, 
-  Settings, 
-  ShieldCheck, 
+import {
+  Store,
+  ChevronDown,
+  Search,
+  Bell,
+  LogOut,
+  UserCheck,
+  Sliders,
+  Crown,
+  Compass,
+  CheckCircle2,
+  AlertTriangle,
+  DollarSign,
+  Boxes,
+  Truck,
+  User,
+  Settings,
+  ShieldCheck,
   Building2,
   ExternalLink,
   Tag,
@@ -41,7 +41,8 @@ import {
   FileSpreadsheet,
   Award,
   Globe,
-  Users
+  Users,
+  Palette
 } from 'lucide-react';
 import { NotificationItem, ModuleKey, CompanyConfig, AppUser, Seller } from '../types';
 
@@ -105,6 +106,14 @@ export const Header: React.FC<HeaderProps> = ({
   const toggleDropdown = (key: DropdownKey) => {
     setActiveDropdown(prev => prev === key ? null : key);
   };
+
+  // Módulos de planta: se muestran según el perfil del Control Maestro (el creador ve todo)
+  const isCreatorUser = currentUser?.role === 'creador';
+  const isModuleOn = (k: ModuleKey) => config?.systemModuleToggles?.[k] !== false;
+  const factoryMenuItems = ([
+    { key: 'production' as ModuleKey, label: 'Producción & Fórmulas', icon: Factory },
+    { key: 'color_recipes' as ModuleKey, label: 'Recetas de Color', icon: Palette }
+  ]).filter(it => isCreatorUser || isModuleOn(it.key));
 
   const handleNavigate = (mod: ModuleKey) => {
     setActiveModule(mod);
@@ -361,7 +370,7 @@ export const Header: React.FC<HeaderProps> = ({
                     'inventory', 'combos', 'faltantes', 'stock_adjustments', 
                     'mass_modification', 'warehouses', 'transfers', 'branch_orders', 
                     'import_products', 'import_stock', 'brands_categories', 'price_tags', 
-                    'prices', 'update_prices'
+                    'prices', 'update_prices', 'production', 'color_recipes'
                   ].includes(activeModule)
                     ? 'bg-slate-800 text-orange-400 font-bold'
                     : 'hover:bg-slate-800/80 hover:text-white text-slate-300'
@@ -374,6 +383,31 @@ export const Header: React.FC<HeaderProps> = ({
 
               {activeDropdown === 'products' && (
                 <div className="absolute left-0 mt-1.5 w-64 bg-[#141d2b] border border-slate-700/80 rounded-xl shadow-2xl py-1 text-slate-200 z-50 text-xs animate-in fade-in slide-in-from-top-1 font-medium max-h-[85vh] overflow-y-auto">
+                  {factoryMenuItems.length > 0 && (
+                    <>
+                      <div className="px-3.5 pt-1.5 pb-1 text-[10px] uppercase font-bold tracking-wider text-amber-400">Planta & Producción</div>
+                      {factoryMenuItems.map(it => {
+                        const Icon = it.icon;
+                        const off = !isModuleOn(it.key);
+                        return (
+                          <button
+                            key={it.key}
+                            onClick={() => handleNavigate(it.key)}
+                            className={`w-full text-left px-3.5 py-2 flex items-center gap-2.5 transition-colors group ${
+                              activeModule === it.key
+                                ? 'text-orange-400 bg-orange-950/40 font-bold hover:bg-orange-950/70'
+                                : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <Icon className={`w-4 h-4 transition-colors shrink-0 ${activeModule === it.key ? 'text-orange-500' : 'text-amber-400 group-hover:text-white'}`} />
+                            <span className="truncate">{it.label}</span>
+                            {off && <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">OFF</span>}
+                          </button>
+                        );
+                      })}
+                      <div className="my-1 border-t border-slate-700/70" />
+                    </>
+                  )}
                   <button
                     onClick={() => handleNavigate('inventory')}
                     className={`w-full text-left px-3.5 py-2 flex items-center gap-2.5 transition-colors group ${
@@ -1062,6 +1096,15 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="py-2 space-y-1">
             <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wider">Productos</span>
             <div className="grid grid-cols-2 gap-1 pt-1">
+              {factoryMenuItems.map(it => (
+                <button
+                  key={it.key}
+                  onClick={() => { handleNavigate(it.key); setIsMobileNavOpen(false); }}
+                  className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-amber-300 font-semibold"
+                >
+                  {it.label}{!isModuleOn(it.key) ? ' (off)' : ''}
+                </button>
+              ))}
               <button
                 onClick={() => { handleNavigate('inventory'); setIsMobileNavOpen(false); }}
                 className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-slate-200"
