@@ -79,6 +79,7 @@ const ALL_SYSTEM_MODULES: { key: ModuleKey; label: string; group: string; desc: 
   { key: 'prices', label: 'Lista de Precios & SKUs', group: 'Comercial & Preventa', desc: 'Catálogo de látex y precios 2026' },
   
   { key: 'production', label: 'Producción & Fórmulas', group: 'Planta Industrial', desc: 'Órdenes de fabricación y mezclas químicas' },
+  { key: 'color_recipes', label: 'Recetas de Color & Lotes', group: 'Planta Industrial', desc: 'Pigmentos por kg/litro y número de lote' },
   { key: 'purchases', label: 'Compras & Proveedores', group: 'Planta Industrial', desc: 'Materias primas y cuentas corrientes proveedores' },
   { key: 'logistics', label: 'Transportes & Logística', group: 'Planta Industrial', desc: 'Flota de camiones y choferes de fábrica' },
   

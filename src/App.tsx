@@ -32,6 +32,8 @@ import {
 import { 
   RawMaterial, 
   Formula, 
+  ColorRecipe,
+  ColorBatch,
   Product, 
   ProductionOrder, 
   SalesOrder, 
@@ -71,6 +73,7 @@ import {
 import { Header } from './components/Header';
 import { DesktopModule } from './components/DesktopModule';
 import { ProductionModule } from './components/ProductionModule';
+import { ColorRecipesModule } from './components/ColorRecipesModule';
 import { SalesOrdersModule } from './components/SalesOrdersModule';
 import { SellersModule } from './components/SellersModule';
 import { PriceListModule } from './components/PriceListModule';
@@ -142,6 +145,7 @@ export default function App() {
       case 'customers': return 'Clientes & Cuentas';
       case 'sellers': return 'Vendedores & Rutas';
       case 'production': return 'Producción & Lotes';
+      case 'color_recipes': return 'Recetas de Color';
       case 'purchases': return 'Compras & Proveedores';
       case 'cashboxes': return 'Cajas de Dinero';
       case 'finances': return 'Finanzas';
@@ -216,6 +220,8 @@ export default function App() {
   // State collections synced from Firestore
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [formulas, setFormulas] = useState<Formula[]>([]);
+  const [colorRecipes, setColorRecipes] = useState<ColorRecipe[]>([]);
+  const [colorBatches, setColorBatches] = useState<ColorBatch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
@@ -323,6 +329,20 @@ export default function App() {
           handleFirestoreError(error, OperationType.GET, 'formulas');
         });
         unsubscribes.push(unsubForm);
+
+        // 2b. Recetas de color y lotes de color
+        const unsubColorRecipes = onSnapshot(collection(db, 'color_recipes'), snap => {
+          setColorRecipes(snap.docs.map(d => ({ id: d.id, ...d.data() } as ColorRecipe)));
+        }, error => {
+          handleFirestoreError(error, OperationType.GET, 'color_recipes');
+        });
+        unsubscribes.push(unsubColorRecipes);
+        const unsubColorBatches = onSnapshot(collection(db, 'color_batches'), snap => {
+          setColorBatches(snap.docs.map(d => ({ id: d.id, ...d.data() } as ColorBatch)));
+        }, error => {
+          handleFirestoreError(error, OperationType.GET, 'color_batches');
+        });
+        unsubscribes.push(unsubColorBatches);
 
         // 3. Products
         const unsubProd = onSnapshot(collection(db, 'products'), snap => {
@@ -726,6 +746,39 @@ export default function App() {
       await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'production_orders');
+    }
+  };
+
+  // Completar lote de color: descuenta materias primas y deja registro en kardex
+  const handleCompleteColorBatch = async (colorBatch: ColorBatch) => {
+    try {
+      const batch = writeBatch(db);
+      const now = new Date().toISOString();
+      batch.update(doc(db, 'color_batches', colorBatch.id), { status: 'completado', completedAt: now });
+      colorBatch.lines.forEach((line, idx) => {
+        const mat = rawMaterials.find(m => m.id === line.rawMaterialId);
+        if (!mat) return;
+        batch.update(doc(db, 'raw_materials', mat.id), {
+          currentStock: Math.max(0, mat.currentStock - line.quantityKg)
+        });
+        const movId = `mov-${Date.now()}-${idx}-${Math.floor(Math.random() * 999)}`;
+        batch.set(doc(db, 'inventory_movements', movId), {
+          id: movId,
+          itemType: 'raw_material',
+          itemId: mat.id,
+          itemName: mat.name,
+          movementType: 'salida_produccion',
+          quantity: -line.quantityKg,
+          unit: mat.unit,
+          reference: `Receta ${colorBatch.recipeCode} ${colorBatch.recipeName} - Lote: ${colorBatch.batchNumber}`,
+          batchNumber: colorBatch.batchNumber,
+          user: colorBatch.operatorName || currentUser?.name || '',
+          date: now
+        });
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'color_batches');
     }
   };
 
@@ -1632,7 +1685,7 @@ export default function App() {
   };
 
   const ALL_MODULES_LIST: ModuleKey[] = [
-    'desktop', 'reports', 'ai_assistant', 'production', 'purchases', 'prices',
+    'desktop', 'reports', 'ai_assistant', 'production', 'color_recipes', 'purchases', 'prices',
     'sales', 'sellers', 'customers', 'installments', 'loyalty', 'logistics',
     'customer_portal', 'finances', 'checks', 'cashboxes', 'arca_fiscal',
     'accounting', 'profitability', 'employees', 'users', 'settings'
@@ -1815,6 +1868,33 @@ export default function App() {
               onExportPriceListExcel={() => exportPriceListToExcel(products, companyConfig || undefined)}
               onNavigateToCustomer={(cust) => handleSelectModuleWithTab('customers')}
               onOpenMobileSellerApp={() => setIsMobileSellerAppOpen(true)}
+            />
+          )}
+
+          {activeModule === 'color_recipes' && (
+            <ColorRecipesModule
+              rawMaterials={rawMaterials}
+              formulas={formulas}
+              recipes={colorRecipes}
+              batches={colorBatches}
+              companyName={companyConfig?.companyName}
+              onSaveRecipe={async (recipe) => {
+                try { await setDoc(doc(db, 'color_recipes', recipe.id), recipe); }
+                catch (error) { handleFirestoreError(error, OperationType.WRITE, 'color_recipes'); }
+              }}
+              onDeleteRecipe={async (id) => {
+                try { await deleteDoc(doc(db, 'color_recipes', id)); }
+                catch (error) { handleFirestoreError(error, OperationType.DELETE, 'color_recipes'); }
+              }}
+              onSaveBatch={async (b) => {
+                try { await setDoc(doc(db, 'color_batches', b.id), b); }
+                catch (error) { handleFirestoreError(error, OperationType.CREATE, 'color_batches'); }
+              }}
+              onCompleteBatch={handleCompleteColorBatch}
+              onCancelBatch={async (b) => {
+                try { await updateDoc(doc(db, 'color_batches', b.id), { status: 'anulado' }); }
+                catch (error) { handleFirestoreError(error, OperationType.UPDATE, 'color_batches'); }
+              }}
             />
           )}
 

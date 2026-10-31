@@ -30,7 +30,10 @@ import {
   Building2,
   CheckCircle2,
   AlertCircle,
-  Package
+  Package,
+  Palette,
+  Hammer,
+  PaintBucket
 } from 'lucide-react';
 import { ModuleKey } from '../types';
 
@@ -87,8 +90,16 @@ const ALL_MODULES_METADATA: ModuleMeta[] = [
     desc: 'Gestión de tanques, partidas, control de calidad (viscosidad/pH) y consumo de materias primas.'
   },
   {
+    key: 'color_recipes',
+    label: 'Recetas de Color & Lotes',
+    category: 'factory',
+    icon: Palette,
+    desc: 'Recetas con pigmentos que escalan a los kg o litros a producir, con número de lote y hoja imprimible.',
+    badge: 'Pinturería'
+  },
+  {
     key: 'purchases',
-    label: 'Compras & Proveedores Químicos',
+    label: 'Compras & Proveedores',
     category: 'factory',
     icon: PackageSearch,
     desc: 'Pedidos de compra a proveedores de resinas, pigmentos, cargas y envases litografiados.'
@@ -332,6 +343,64 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
     }
   };
 
+  // Perfiles de negocio: dejan el sistema listo según el tipo de cliente
+  const BUSINESS_PROFILES: {
+    id: string;
+    label: string;
+    desc: string;
+    icon: React.ElementType;
+    off: ModuleKey[];
+    tone: string;
+  }[] = [
+    {
+      id: 'ferreteria',
+      label: 'Ferretería',
+      desc: 'Sin producción ni recetas de color',
+      icon: Hammer,
+      off: ['production', 'color_recipes'],
+      tone: 'bg-orange-50 border-orange-200 text-orange-900 hover:bg-orange-100'
+    },
+    {
+      id: 'pintureria',
+      label: 'Pinturería (venta + tintométrico)',
+      desc: 'Recetas de color sí, planta industrial no',
+      icon: PaintBucket,
+      off: ['production'],
+      tone: 'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-900 hover:bg-fuchsia-100'
+    },
+    {
+      id: 'fabrica',
+      label: 'Fábrica de pintura',
+      desc: 'Producción, fórmulas, recetas y lotes',
+      icon: Factory,
+      off: [],
+      tone: 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100'
+    }
+  ];
+
+  const currentProfileId = BUSINESS_PROFILES.find(p =>
+    ALL_MODULES_METADATA.every(m => isModuleActive(m.key) === !p.off.includes(m.key))
+  )?.id;
+
+  const handleApplyProfile = async (profileId: string) => {
+    const profile = BUSINESS_PROFILES.find(p => p.id === profileId);
+    if (!profile) return;
+    if (!window.confirm(`¿Aplicar el perfil "${profile.label}"? Se activan todos los módulos excepto: ${profile.off.length ? profile.off.map(k => ALL_MODULES_METADATA.find(m => m.key === k)?.label).join(', ') : 'ninguno'}.`)) {
+      return;
+    }
+    setIsUpdating(true);
+    try {
+      const updates: Partial<Record<ModuleKey, boolean>> = {};
+      ALL_MODULES_METADATA.forEach(m => {
+        updates[m.key] = !profile.off.includes(m.key);
+      });
+      await onBatchToggleModules(updates);
+      showToast(`Perfil "${profile.label}" aplicado.`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const filteredModules = ALL_MODULES_METADATA.filter(m => {
     const matchesCategory = selectedCategory === 'all' || m.category === selectedCategory;
     const matchesSearch = searchTerm === '' || 
@@ -434,6 +503,37 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
             <button onClick={() => setToastMessage(null)} className="text-indigo-200 hover:text-white">✕</button>
           </div>
         )}
+
+        {/* Perfiles de negocio */}
+        <div className="p-4 border-b border-slate-200 bg-white">
+          <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">
+            Perfil de negocio · configuración rápida para vender el sistema
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {BUSINESS_PROFILES.map(p => {
+              const Icon = p.icon;
+              const active = currentProfileId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() => handleApplyProfile(p.id)}
+                  className={`text-left p-3 rounded-2xl border transition-colors disabled:opacity-50 ${p.tone} ${active ? 'ring-2 ring-indigo-500' : ''}`}
+                >
+                  <div className="flex items-center gap-2 font-extrabold text-sm">
+                    <Icon className="w-4 h-4" /> {p.label}
+                    {active && <span className="ml-auto text-[10px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full">ACTUAL</span>}
+                  </div>
+                  <div className="text-[11px] mt-0.5 opacity-80">{p.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">
+            Después podés afinar módulo por módulo abajo. Como creador seguís viendo todo; los usuarios del cliente solo ven lo activo.
+          </p>
+        </div>
 
         {/* Filter & Search Bar */}
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">

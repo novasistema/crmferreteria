@@ -662,7 +662,7 @@ export const INITIAL_FACTORY_USERS: AppUser[] = [
     active: true,
     phone: '+54 11 9999-0000',
     allowedModules: [
-      'desktop', 'production', 'sales', 'sellers', 'prices', 'customers',
+      'desktop', 'production', 'color_recipes', 'sales', 'sellers', 'prices', 'customers',
       'installments', 'loyalty', 'checks', 'cashboxes', 'arca_fiscal',
       'accounting', 'profitability', 'employees', 'logistics', 'purchases',
       'finances', 'reports', 'customer_portal', 'ai_assistant', 'settings', 'users'

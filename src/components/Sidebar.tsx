@@ -27,7 +27,8 @@ import {
   Building2,
   Sliders,
   ShieldAlert,
-  Package
+  Package,
+  Palette
 } from 'lucide-react';
 import { ModuleKey, UserRole } from '../types';
 
@@ -141,6 +142,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: productionActiveCount > 0 ? `${productionActiveCount}` : null,
           badgeColor: 'bg-amber-900/60 text-amber-300 border border-amber-700/50',
           desc: 'Lotes de pintura y materias primas'
+        },
+        {
+          key: 'color_recipes',
+          label: 'Recetas de Color',
+          icon: Palette,
+          badge: null,
+          badgeColor: 'bg-fuchsia-900/60 text-fuchsia-300 border border-fuchsia-700/50',
+          desc: 'Pigmentos por kg/litro y número de lote'
         },
         {
           key: 'inventory',

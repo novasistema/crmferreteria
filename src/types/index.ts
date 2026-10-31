@@ -35,6 +35,61 @@ export interface Formula {
   createdAt: string;
 }
 
+// --- RECETAS DE COLOR (Pinturería / Fábrica) ---
+export interface ColorRecipeItem {
+  rawMaterialId: string;
+  rawMaterialName: string;
+  category?: RawMaterialCategory;
+  unit: UnitType;
+  percentage: number; // % en peso sobre el total de la receta (la suma da 100)
+}
+
+export interface ColorRecipe {
+  id: string;
+  code: string; // ej: COL-0001
+  name: string; // ej: Verde Manzana
+  colorHex: string; // muestra visual
+  paintType: string; // Látex Interior, Esmalte, etc.
+  baseFormulaId?: string; // fórmula base de la que se partió (opcional)
+  density: number; // kg/L, para convertir litros a kg
+  items: ColorRecipeItem[];
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type ColorBatchStatus = 'en_proceso' | 'completado' | 'anulado';
+
+export interface ColorBatchLine {
+  rawMaterialId: string;
+  rawMaterialName: string;
+  unit: UnitType;
+  percentage: number;
+  quantityKg: number; // cantidad calculada para este lote
+  unitCost: number;
+}
+
+export interface ColorBatch {
+  id: string;
+  batchNumber: string; // Número de lote (ej: LC-2610-0001)
+  recipeId: string;
+  recipeName: string;
+  recipeCode: string;
+  colorHex: string;
+  requestedQuantity: number;
+  requestedUnit: 'kg' | 'litro';
+  totalKg: number;
+  totalLiters: number;
+  density: number;
+  lines: ColorBatchLine[];
+  totalCost: number;
+  operatorName: string;
+  status: ColorBatchStatus;
+  notes?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
 export type PackagingType = 'balde_20l' | 'lata_10l' | 'lata_4l' | 'lata_1l' | 'tambor_200l';
 
 export type ProductionStatus = 'planificada' | 'en_proceso' | 'control_calidad' | 'completada' | 'cancelada';
@@ -448,6 +503,7 @@ export interface CompanyConfig {
 export type ModuleKey = 
   | 'desktop'
   | 'production'
+  | 'color_recipes'
   | 'sales'
   | 'sellers'
   | 'prices'

@@ -31,6 +31,7 @@ export const TabsBar: React.FC<TabsBarProps> = ({
         return <ShoppingCart className="w-3.5 h-3.5 shrink-0" />;
       case 'inventory':
       case 'production':
+      case 'color_recipes':
         return <Package className="w-3.5 h-3.5 shrink-0" />;
       case 'customers':
       case 'sellers':

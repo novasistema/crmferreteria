@@ -75,6 +75,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     { key: 'cashboxes', title: 'Cajas de Dinero & Cuentas', category: 'Tesorería' },
     { key: 'finances', title: 'Finanzas (Cobrar vs Pagar)', category: 'Finanzas' },
     { key: 'production', title: 'Producción & Fórmulas', category: 'Fábrica' },
+    { key: 'color_recipes', title: 'Recetas de Color & Lotes', category: 'Fábrica' },
     { key: 'loyalty', title: 'Cupones & Fidelización', category: 'Marketing' }
   ];
 
