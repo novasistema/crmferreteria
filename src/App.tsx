@@ -101,6 +101,7 @@ import { LoyaltyModule } from './components/LoyaltyModule';
 import { ArcaFiscalModule } from './components/ArcaFiscalModule';
 import { SystemAssistantModule } from './components/SystemAssistantModule';
 import { CreatorModuleControlModal } from './components/CreatorModuleControlModal';
+import { CreatorPanelLock, CreatorLockMode, hashCreatorPassword, generateSalt } from './components/CreatorPanelLock';
 import { TabsBar, TabItem } from './components/TabsBar';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { exportPriceListToExcel } from './utils/exportUtils';
@@ -202,6 +203,9 @@ export default function App() {
   }, []);
 
   const [isCreatorModuleControlOpen, setIsCreatorModuleControlOpen] = useState(false);
+  // El Control Maestro pide contraseña cada vez que se abre
+  const [creatorPanelUnlocked, setCreatorPanelUnlocked] = useState(false);
+  const [creatorLockMode, setCreatorLockMode] = useState<CreatorLockMode | null>(null);
   const [portalClientTaxId, setPortalClientTaxId] = useState<string | null>(() => {
     return localStorage.getItem('colorear_portal_client_tax_id');
   });
@@ -1656,13 +1660,48 @@ export default function App() {
     }
   };
 
+  const openCreatorModuleControl = () => {
+    if (currentUser?.role !== 'creador') return;
+    setCreatorPanelUnlocked(false);
+    setCreatorLockMode(companyConfig?.creatorPanelPasswordHash ? 'unlock' : 'setup');
+    setIsCreatorModuleControlOpen(true);
+  };
+
+  const closeCreatorModuleControl = () => {
+    setIsCreatorModuleControlOpen(false);
+    setCreatorPanelUnlocked(false);
+    setCreatorLockMode(null);
+  };
+
+  const verifyCreatorPassword = async (password: string) => {
+    const hash = companyConfig?.creatorPanelPasswordHash;
+    const salt = companyConfig?.creatorPanelPasswordSalt || '';
+    if (!hash) return false;
+    return (await hashCreatorPassword(password, salt)) === hash;
+  };
+
+  const saveCreatorPassword = async (password: string) => {
+    if (currentUser?.role !== 'creador') throw new Error('Solo el creador puede cambiar la contraseña');
+    const salt = generateSalt();
+    const hash = await hashCreatorPassword(password, salt);
+    await setDoc(doc(db, 'company_config', 'main_config'), {
+      creatorPanelPasswordHash: hash,
+      creatorPanelPasswordSalt: salt
+    }, { merge: true });
+    setCompanyConfig(prev => prev ? { ...prev, creatorPanelPasswordHash: hash, creatorPanelPasswordSalt: salt } : prev);
+  };
+
+  const canEditModules = () => currentUser?.role === 'creador' && creatorPanelUnlocked;
+
   const handleLogout = () => {
+    closeCreatorModuleControl();
     setCurrentUser(null);
     setIsMobileSellerAppOpen(false);
     localStorage.removeItem('colorear_current_user');
   };
 
   const handleToggleSystemModule = async (moduleKey: ModuleKey, enabled: boolean) => {
+    if (!canEditModules()) return;
     try {
       const currentToggles = companyConfig?.systemModuleToggles || {};
       const updatedToggles: Partial<Record<ModuleKey, boolean>> = { ...currentToggles, [moduleKey]: enabled };
@@ -1675,6 +1714,7 @@ export default function App() {
   };
 
   const handleBatchToggleSystemModules = async (updates: Partial<Record<ModuleKey, boolean>>) => {
+    if (!canEditModules()) return;
     try {
       const currentToggles = companyConfig?.systemModuleToggles || {};
       const updatedToggles: Partial<Record<ModuleKey, boolean>> = { ...currentToggles, ...updates };
@@ -1819,7 +1859,7 @@ export default function App() {
         onExitPortal={handleLogoutClient}
         onOpenCustomerPortalModal={() => handleSelectModuleWithTab('customer_portal')}
         onOpenMobileSellerApp={() => setIsMobileSellerAppOpen(true)}
-        onOpenCreatorModuleControl={() => setIsCreatorModuleControlOpen(true)}
+        onOpenCreatorModuleControl={openCreatorModuleControl}
         onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         activeModulesCount={activeModulesCount}
       />
@@ -2548,7 +2588,7 @@ export default function App() {
                 setCashMovements([]);
                 setSalaryPayments([]);
               }}
-              onOpenCreatorModuleControl={() => setIsCreatorModuleControlOpen(true)}
+              onOpenCreatorModuleControl={openCreatorModuleControl}
             />
           )}
 
@@ -2571,9 +2611,29 @@ export default function App() {
       </div>
 
       {/* Creator Master Module Control Modal */}
+      {isCreatorModuleControlOpen && currentUser?.role === 'creador' && creatorLockMode && (
+        <CreatorPanelLock
+          key={creatorLockMode}
+          mode={creatorLockMode}
+          onClose={() => {
+            // Cancelar un cambio de contraseña vuelve al panel; cancelar el acceso lo cierra
+            if (creatorLockMode === 'change' && creatorPanelUnlocked) setCreatorLockMode(null);
+            else closeCreatorModuleControl();
+          }}
+          onVerify={verifyCreatorPassword}
+          onSetPassword={saveCreatorPassword}
+          onUnlocked={() => {
+            setCreatorPanelUnlocked(true);
+            setCreatorLockMode(null);
+          }}
+        />
+      )}
+
       <CreatorModuleControlModal
-        isOpen={isCreatorModuleControlOpen}
-        onClose={() => setIsCreatorModuleControlOpen(false)}
+        isOpen={isCreatorModuleControlOpen && currentUser?.role === 'creador' && creatorPanelUnlocked && !creatorLockMode}
+        onClose={closeCreatorModuleControl}
+        onLock={closeCreatorModuleControl}
+        onChangePassword={() => setCreatorLockMode('change')}
         systemModuleToggles={companyConfig?.systemModuleToggles}
         onToggleModule={handleToggleSystemModule}
         onBatchToggleModules={handleBatchToggleSystemModules}

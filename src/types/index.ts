@@ -498,6 +498,8 @@ export interface CompanyConfig {
   notificationWhatsappTemplate: string;
   paymentReminderTemplate: string;
   systemModuleToggles?: Partial<Record<ModuleKey, boolean>>; // Control Maestro de Módulos del Creador
+  creatorPanelPasswordHash?: string; // SHA-256 de la contraseña del Control Maestro
+  creatorPanelPasswordSalt?: string;
 }
 
 export type ModuleKey = 

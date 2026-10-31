@@ -33,7 +33,9 @@ import {
   Package,
   Palette,
   Hammer,
-  PaintBucket
+  PaintBucket,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import { ModuleKey } from '../types';
 
@@ -44,6 +46,8 @@ interface CreatorModuleControlModalProps {
   onToggleModule: (moduleKey: ModuleKey, enabled: boolean) => Promise<void>;
   onBatchToggleModules: (updates: Partial<Record<ModuleKey, boolean>>) => Promise<void>;
   onNavigateToModule?: (moduleKey: ModuleKey) => void;
+  onChangePassword?: () => void;
+  onLock?: () => void;
 }
 
 interface ModuleMeta {
@@ -274,7 +278,9 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
   systemModuleToggles = {},
   onToggleModule,
   onBatchToggleModules,
-  onNavigateToModule
+  onNavigateToModule,
+  onChangePassword,
+  onLock
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -449,13 +455,33 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
-              title="Cerrar panel"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {onChangePassword && (
+                <button
+                  onClick={onChangePassword}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-bold transition-colors"
+                  title="Cambiar contraseña del Creador"
+                >
+                  <KeyRound className="w-4 h-4" /> Contraseña
+                </button>
+              )}
+              {onLock && (
+                <button
+                  onClick={onLock}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-bold transition-colors"
+                  title="Bloquear y cerrar"
+                >
+                  <Lock className="w-4 h-4" /> Bloquear
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
+                title="Cerrar panel"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Quick Stats & Bulk Actions Bar */}
