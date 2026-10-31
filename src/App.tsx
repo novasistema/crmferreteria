@@ -74,6 +74,7 @@ import { Header } from './components/Header';
 import { DesktopModule } from './components/DesktopModule';
 import { ProductionModule } from './components/ProductionModule';
 import { ColorRecipesModule } from './components/ColorRecipesModule';
+import { seedColorRecipesDemoIfNeeded } from './services/colorRecipesDemoSeed';
 import { SalesOrdersModule } from './components/SalesOrdersModule';
 import { SellersModule } from './components/SellersModule';
 import { PriceListModule } from './components/PriceListModule';
@@ -301,6 +302,7 @@ export default function App() {
         await seedSellersIfEmpty();
         await seedLoyaltyAndInstallmentsIfEmpty();
         await seedQuotesAndRemitosIfEmpty();
+        await seedColorRecipesDemoIfNeeded();
 
         // Check if official August 2026 catalog with SKUs needs to be synchronized
         try {
