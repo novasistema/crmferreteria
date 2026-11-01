@@ -458,7 +458,7 @@ export interface PurchaseOrder {
 
 export interface FinancialTransaction {
   id: string;
-  type: 'cobro_cliente' | 'pago_proveedor' | 'gasto_operativo' | 'sueldos' | 'mantenimiento';
+  type: 'cobro_cliente' | 'pago_proveedor' | 'gasto_operativo' | 'sueldos' | 'mantenimiento' | 'impuestos';
   direction: 'ingreso' | 'egreso';
   amount: number;
   date: string;
@@ -509,6 +509,81 @@ export interface CompanyConfig {
   arcaCertNotAfter?: string;
   arcaTaEnc?: string; // ticket de acceso vigente, cifrado
   arcaLastTest?: ArcaConnectionTest;
+  taxSettings?: TaxSettings; // Contador Interno
+}
+
+// --- CONTADOR INTERNO (IVA + Ingresos Brutos) ---
+export type IibbRegime = 'local' | 'convenio_multilateral' | 'simplificado' | 'exento';
+
+export interface IibbActivity {
+  id: string;
+  name: string;
+  code?: string; // código NAES
+  rate: number; // alícuota %
+  share: number; // % de las ventas que corresponden a esta actividad
+}
+
+export interface TaxSettings {
+  ivaCondition: 'responsable_inscripto' | 'monotributo' | 'exento';
+  iibbRegime: IibbRegime;
+  iibbNumber?: string;
+  iibbJurisdiction: string; // ej: Córdoba
+  iibbCoefficient: number; // coeficiente unificado (Convenio Multilateral), 1 para local
+  iibbActivities: IibbActivity[];
+  iibbMonthlyMinimum: number;
+  iibbIncludeNonInvoicedSales: boolean;
+  ivaDueDay: number; // día de vencimiento según terminación de CUIT
+  iibbDueDay: number;
+  startPeriod: string; // YYYY-MM desde el que se arrastran saldos
+  initialIvaTechnicalBalance: number; // saldo técnico a favor al inicio
+  initialIvaFreeBalance: number; // saldo de libre disponibilidad al inicio
+  initialIibbBalance: number; // saldo a favor IIBB al inicio
+  monotributoCategory?: string;
+  monotributoMonthlyFee?: number;
+  monotributoAnnualLimit?: number;
+  defaultPaymentEntity: string; // Red Link, Banelco, Interbanking...
+}
+
+export type TaxAdjustmentKind =
+  | 'retencion_iva'
+  | 'percepcion_iva'
+  | 'retencion_iibb'
+  | 'percepcion_iibb'
+  | 'sircreb'
+  | 'sirtac'
+  | 'otro_credito_iva'
+  | 'otro_debito_iva';
+
+export interface TaxAdjustment {
+  id: string;
+  kind: TaxAdjustmentKind;
+  amount: number;
+  description: string;
+  date?: string;
+}
+
+export type TaxPaymentStatus = 'pendiente' | 'ddjj_presentada' | 'vep_generado' | 'pagado';
+
+export interface TaxPaymentRecord {
+  status: TaxPaymentStatus;
+  amount?: number; // importe calculado al momento de generar el VEP
+  vepNumber?: string;
+  paymentEntity?: string;
+  vepDate?: string;
+  paidDate?: string;
+  paidAmount?: number;
+  paymentMethod?: string;
+  transactionId?: string; // egreso registrado en finanzas
+  notes?: string;
+}
+
+export interface TaxPeriod {
+  id: string; // YYYY-MM
+  adjustments: TaxAdjustment[];
+  iva?: TaxPaymentRecord;
+  iibb?: TaxPaymentRecord;
+  closed?: boolean;
+  updatedAt?: string;
 }
 
 export interface ArcaConnectionTest {
@@ -549,6 +624,7 @@ export type ModuleKey =
   | 'cashboxes'
   | 'arca_fiscal'
   | 'accounting'
+  | 'tax_accountant'
   | 'profitability'
   | 'employees'
   | 'logistics'

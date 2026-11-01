@@ -42,7 +42,8 @@ import {
   Award,
   Globe,
   Users,
-  Palette
+  Palette,
+  Calculator
 } from 'lucide-react';
 import { NotificationItem, ModuleKey, CompanyConfig, AppUser, Seller } from '../types';
 
@@ -589,7 +590,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
                   activeDropdown === 'admin' || [
                     'purchases', 'cashboxes', 'checks', 'finances', 
-                    'accounting', 'profitability', 'employees', 
+                    'accounting', 'tax_accountant', 'profitability', 'employees', 
                     'installments', 'loyalty', 'logistics'
                   ].includes(activeModule)
                     ? 'bg-slate-800 text-orange-400 font-bold'
@@ -689,6 +690,25 @@ export const Header: React.FC<HeaderProps> = ({
                       F.2002
                     </span>
                   </button>
+
+                  {(isCreatorUser || isModuleOn('tax_accountant')) && (
+                    <button
+                      onClick={() => handleNavigate('tax_accountant')}
+                      className={`w-full text-left px-3.5 py-2 flex items-center justify-between gap-2.5 transition-colors group ${
+                        activeModule === 'tax_accountant'
+                          ? 'text-orange-400 bg-orange-950/40 font-bold hover:bg-orange-950/70'
+                          : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Calculator className={`w-4 h-4 transition-colors shrink-0 ${activeModule === 'tax_accountant' ? 'text-orange-500' : 'text-emerald-400 group-hover:text-white'}`} />
+                        <span className="truncate">Contador Interno</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 shrink-0">
+                        {!isModuleOn('tax_accountant') ? 'OFF' : 'IVA·IIBB'}
+                      </span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => handleNavigate('profitability')}
@@ -845,7 +865,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <span className="truncate font-semibold">Control de Módulos</span>
                       </div>
                       <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-purple-950/60 border border-purple-500/30 text-purple-300 shrink-0 font-bold">
-                        {activeModulesCount !== undefined ? `${activeModulesCount}/22` : '22'}
+                        {activeModulesCount !== undefined ? `${activeModulesCount}` : ''}
                       </span>
                     </button>
                   )}
@@ -1226,6 +1246,14 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 Contabilidad & IVA
               </button>
+              {(isCreatorUser || isModuleOn('tax_accountant')) && (
+                <button
+                  onClick={() => { handleNavigate('tax_accountant'); setIsMobileNavOpen(false); }}
+                  className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-emerald-300 font-semibold"
+                >
+                  Contador Interno
+                </button>
+              )}
               <button
                 onClick={() => { handleNavigate('employees'); setIsMobileNavOpen(false); }}
                 className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-slate-200"

@@ -41,6 +41,7 @@ export const TabsBar: React.FC<TabsBarProps> = ({
       case 'finances':
       case 'cashboxes':
       case 'checks':
+      case 'tax_accountant':
         return <CircleDollarSign className="w-3.5 h-3.5 shrink-0" />;
       case 'reports':
         return <BarChart3 className="w-3.5 h-3.5 shrink-0" />;

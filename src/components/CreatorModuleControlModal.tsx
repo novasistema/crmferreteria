@@ -235,6 +235,14 @@ const ALL_MODULES_METADATA: ModuleMeta[] = [
     desc: 'Libro IVA Ventas, IVA Compras, retenciones y exportación de datos para Declaración F.2002.'
   },
   {
+    key: 'tax_accountant',
+    label: 'Contador Interno (IVA & IIBB)',
+    category: 'finances',
+    icon: Calculator,
+    desc: 'Liquidación mensual de IVA e Ingresos Brutos, saldos a favor, retenciones, vencimientos, VEP y registro de pagos.',
+    badge: 'Nuevo'
+  },
+  {
     key: 'profitability',
     label: 'Estado de Resultados & Rentabilidad',
     category: 'finances',

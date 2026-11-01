@@ -87,6 +87,7 @@ const ALL_SYSTEM_MODULES: { key: ModuleKey; label: string; group: string; desc: 
   { key: 'cashboxes', label: 'Cajas de Dinero & Cuentas', group: 'Tesorería & Finanzas', desc: 'Movimientos de efectivo y transferencias' },
   { key: 'checks', label: 'Cartelera Cheques & E-Cheqs', group: 'Tesorería & Finanzas', desc: 'Gestión y vencimientos de cheques' },
   { key: 'accounting', label: 'Contabilidad & Libro IVA', group: 'Tesorería & Finanzas', desc: 'Libro IVA compras/ventas y F.2002' },
+  { key: 'tax_accountant', label: 'Contador Interno', group: 'Tesorería & Finanzas', desc: 'IVA, Ingresos Brutos, VEP y vencimientos' },
   { key: 'profitability', label: 'Estado de Resultados', group: 'Tesorería & Finanzas', desc: 'EBITDA, CMV y márgenes de ganancia' },
   
   { key: 'employees', label: 'Personal, Sueldos & Recibos', group: 'Personal & Sistema', desc: 'Legajos de empleados y recibos duplicados' },

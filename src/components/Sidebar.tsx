@@ -306,6 +306,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'IVA Ventas, Compras y F.2002'
         },
         {
+          key: 'tax_accountant',
+          label: 'Contador Interno',
+          icon: Calculator,
+          badge: 'IVA · IIBB',
+          badgeColor: 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50',
+          desc: 'Cuánto pagar de IVA e IIBB, VEP y vencimientos'
+        },
+        {
           key: 'profitability',
           label: 'Estado de Resultados',
           icon: TrendingUp,

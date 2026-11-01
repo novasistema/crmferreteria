@@ -35,6 +35,8 @@ import {
   Formula, 
   ColorRecipe,
   ColorBatch,
+  TaxPeriod,
+  TaxSettings,
   Product, 
   ProductionOrder, 
   SalesOrder, 
@@ -76,6 +78,7 @@ import { Header } from './components/Header';
 import { DesktopModule } from './components/DesktopModule';
 import { ProductionModule } from './components/ProductionModule';
 import { ColorRecipesModule } from './components/ColorRecipesModule';
+import { TaxAccountantModule } from './components/TaxAccountantModule';
 import { seedColorRecipesDemoIfNeeded } from './services/colorRecipesDemoSeed';
 import { SalesOrdersModule } from './components/SalesOrdersModule';
 import { SellersModule } from './components/SellersModule';
@@ -157,6 +160,7 @@ export default function App() {
       case 'finances': return 'Finanzas';
       case 'checks': return 'Cheques & E-Cheqs';
       case 'accounting': return 'Contabilidad & IVA';
+      case 'tax_accountant': return 'Contador Interno';
       case 'profitability': return 'Estado de Resultados';
       case 'employees': return 'Personal & Sueldos';
       case 'installments': return 'Cuotas Internas';
@@ -260,6 +264,7 @@ export default function App() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [standaloneRemitos, setStandaloneRemitos] = useState<DeliveryOrder[]>([]);
   const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>([]);
+  const [taxPeriods, setTaxPeriods] = useState<TaxPeriod[]>([]);
   const [activeSellerContext, setActiveSellerContext] = useState<Seller | null>(null);
   const [isMobileSellerAppOpen, setIsMobileSellerAppOpen] = useState(false);
 
@@ -426,6 +431,14 @@ export default function App() {
           handleFirestoreError(error, OperationType.GET, 'purchase_invoices');
         });
         unsubscribes.push(unsubPI);
+
+        // 9c. Contador Interno: períodos fiscales (retenciones, VEP y pagos)
+        const unsubTaxPeriods = onSnapshot(collection(db, 'tax_periods'), snap => {
+          setTaxPeriods(snap.docs.map(d => ({ id: d.id, ...d.data() } as TaxPeriod)));
+        }, error => {
+          handleFirestoreError(error, OperationType.GET, 'tax_periods');
+        });
+        unsubscribes.push(unsubTaxPeriods);
 
         // 10. Financial Transactions
         const unsubTx = onSnapshot(collection(db, 'financial_transactions'), snap => {
@@ -1803,7 +1816,7 @@ export default function App() {
     'desktop', 'reports', 'ai_assistant', 'production', 'color_recipes', 'purchases', 'prices',
     'sales', 'sellers', 'customers', 'installments', 'loyalty', 'logistics',
     'customer_portal', 'finances', 'checks', 'cashboxes', 'arca_fiscal',
-    'accounting', 'profitability', 'employees', 'users', 'settings'
+    'accounting', 'tax_accountant', 'profitability', 'employees', 'users', 'settings'
   ];
 
   const activeModulesCount = ALL_MODULES_LIST.filter(k => companyConfig?.systemModuleToggles?.[k] !== false).length;
@@ -2524,6 +2537,33 @@ export default function App() {
               onSaveCashbox={handleSaveCashbox}
               onAddMovement={handleAddCashMovement}
               onTransferBetweenCashboxes={handleTransferBetweenCashboxes}
+            />
+          )}
+
+          {activeModule === 'tax_accountant' && (
+            <TaxAccountantModule
+              config={companyConfig}
+              vouchers={arcaVouchers}
+              purchaseInvoices={purchaseInvoices}
+              salesOrders={salesOrders}
+              suppliers={suppliers}
+              periods={taxPeriods}
+              currentUserRole={currentUser?.role}
+              onSaveSettings={async (settings: TaxSettings) => {
+                const clean = JSON.parse(JSON.stringify(settings));
+                try {
+                  await setDoc(doc(db, 'company_config', 'main_config'), { taxSettings: clean }, { merge: true });
+                  setCompanyConfig(prev => prev ? { ...prev, taxSettings: clean } : prev);
+                } catch (error) { handleFirestoreError(error, OperationType.WRITE, 'company_config'); }
+              }}
+              onSavePeriod={async (period: TaxPeriod) => {
+                try { await setDoc(doc(db, 'tax_periods', period.id), JSON.parse(JSON.stringify(period))); }
+                catch (error) { handleFirestoreError(error, OperationType.WRITE, 'tax_periods'); }
+              }}
+              onRegisterPayment={async (tx) => {
+                try { await setDoc(doc(db, 'financial_transactions', tx.id), JSON.parse(JSON.stringify(tx))); }
+                catch (error) { handleFirestoreError(error, OperationType.CREATE, 'financial_transactions'); }
+              }}
             />
           )}
 
