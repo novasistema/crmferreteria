@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { 
-  getFirestore, 
+  initializeFirestore, 
   doc, 
   getDocFromServer,
   collection,
@@ -86,7 +86,9 @@ const firebaseConfig = env.VITE_FIREBASE_PROJECT_ID
   : defaultFirebaseConfig;
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// ignoreUndefinedProperties: los campos opcionales vacíos (notas, email, etc.) se omiten en lugar de
+// hacer fallar el guardado con "Unsupported field value: undefined"
+export const db = initializeFirestore(app, { ignoreUndefinedProperties: true }, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
