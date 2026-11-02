@@ -33,7 +33,7 @@ interface QuotesModuleProps {
   onSaveQuote: (quote: Quote) => Promise<void>;
   onDeleteQuote: (quoteId: string) => Promise<void>;
   onUpdateQuoteStatus: (quoteId: string, status: QuoteStatus) => Promise<void>;
-  onConvertToSale: (quote: Quote) => Promise<void>;
+  onConvertToSale: (quote: Quote, billing: 'arca' | 'no_arca') => Promise<void>;
   onConvertToRemito: (quote: Quote) => Promise<void>;
   onOpenTerminalWithQuote: (quote: Quote) => void;
   onOpenNewQuoteTerminal: () => void;
@@ -56,6 +56,7 @@ export const QuotesModule: React.FC<QuotesModuleProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuoteForDetail, setSelectedQuoteForDetail] = useState<Quote | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+  const [convertingQuote, setConvertingQuote] = useState<Quote | null>(null);
 
   // Filtered quotes
   const filteredQuotes = quotes.filter(q => {
@@ -120,13 +121,32 @@ export const QuotesModule: React.FC<QuotesModuleProps> = ({
   };
 
   // Convert quote to sale
-  const handleConvertSale = async (quote: Quote) => {
-    if (!confirm(`¿Desea convertir el Presupuesto ${quote.quoteNumber} a una Orden de Venta / Factura confirmada?`)) return;
+  // Primero se elige si la venta va con factura ARCA (con IVA) o como ingreso de venta sin factura
+  const handleConvertSale = (quote: Quote) => setConvertingQuote(quote);
+
+  const quoteNet = (q: Quote) => Math.round((Number(q.total) - (Number(q.taxAmount) || 0)) * 100) / 100;
+  const quoteWithIva = (q: Quote) => {
+    if ((Number(q.taxAmount) || 0) > 0) return Number(q.total);
+    // Presupuestos viejos sin IVA: se suma según la alícuota de cada ítem
+    const net = quoteNet(q);
+    const lines = q.items.reduce((a, it) => a + (Number(it.subtotal) || 0), 0) || 1;
+    const iva = q.items.reduce((a, it) => a + (Number(it.subtotal) || 0) * ((it.ivaRate ?? 21) / 100), 0) * (net / lines);
+    return Math.round((net + iva) * 100) / 100;
+  };
+
+  const confirmConvertSale = async (billing: 'arca' | 'no_arca') => {
+    const quote = convertingQuote;
+    if (!quote) return;
     setIsProcessingAction(true);
     try {
-      await onConvertToSale(quote);
+      await onConvertToSale(quote, billing);
       await onUpdateQuoteStatus(quote.id, 'convertido_a_pedido');
-      alert(`¡Presupuesto ${quote.quoteNumber} convertido exitosamente en Pedido de Venta!`);
+      setConvertingQuote(null);
+      alert(
+        billing === 'arca'
+          ? `Presupuesto ${quote.quoteNumber} convertido en venta con factura. Autorizala en Facturación ARCA para obtener el CAE.`
+          : `Presupuesto ${quote.quoteNumber} convertido en ingreso de venta sin factura (sin IVA).`
+      );
     } catch (err) {
       console.error(err);
       alert('Error al convertir presupuesto a venta.');
@@ -152,6 +172,55 @@ export const QuotesModule: React.FC<QuotesModuleProps> = ({
 
   return (
     <div className="space-y-5">
+      {convertingQuote && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase font-bold text-slate-400">Cerrar venta</div>
+                <h3 className="text-lg font-black text-slate-900">Presupuesto {convertingQuote.quoteNumber}</h3>
+                <p className="text-xs text-slate-500">{convertingQuote.customerName}</p>
+              </div>
+              <button onClick={() => !isProcessingAction && setConvertingQuote(null)} className="p-2 rounded-lg hover:bg-slate-100"><XCircle className="w-5 h-5 text-slate-400" /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-slate-600">¿Cómo se registra la venta?</p>
+              <button
+                disabled={isProcessingAction}
+                onClick={() => confirmConvertSale('arca')}
+                className="w-full text-left p-4 rounded-2xl border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-extrabold text-slate-900 flex items-center gap-1.5"><FileCheck className="w-4 h-4 text-blue-600" /> Con factura ARCA</div>
+                    <div className="text-xs text-slate-500">Suma el IVA. Queda pendiente de CAE en Facturación ARCA.</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Total con IVA</div>
+                    <div className="font-black font-mono text-slate-900">${quoteWithIva(convertingQuote).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  </div>
+                </div>
+              </button>
+              <button
+                disabled={isProcessingAction}
+                onClick={() => confirmConvertSale('no_arca')}
+                className="w-full text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-extrabold text-slate-900 flex items-center gap-1.5"><ShoppingBag className="w-4 h-4 text-slate-600" /> Ingreso de venta (sin factura)</div>
+                    <div className="text-xs text-slate-500">Sin IVA. No se informa a ARCA.</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Total sin IVA</div>
+                    <div className="font-black font-mono text-slate-900">${quoteNet(convertingQuote).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Informative Header Banner */}
       <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 max-w-4xl space-y-2">

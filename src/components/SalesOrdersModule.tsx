@@ -420,9 +420,30 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
   const ordersPendingDeliveryCount = salesOrders.filter(o => getOrderDeliveryStats(o).pending > 0).length;
 
   // Convert Quote into Sales Order Handler
-  const handleConvertQuoteToSale = async (quote: Quote) => {
+  const handleConvertQuoteToSale = async (quote: Quote, billing: 'arca' | 'no_arca' = 'arca') => {
     const orderNumber = `PED-${new Date().getFullYear()}-${String(salesOrders.length + 86).padStart(3, '0')}`;
-    const invoiceNumber = `FAC-B-0004-${String(Math.floor(Math.random() * 8999 + 1000)).padStart(8, '0')}`;
+    const customer = customers.find(c => c.id === quote.customerId);
+    const customerCategory = quote.customerTaxCategory || customer?.taxCategory || 'consumidor_final';
+    const emitter = config?.taxSettings?.ivaCondition || config?.arcaTaxCondition || 'responsable_inscripto';
+
+    // Importes: el presupuesto puede venir con IVA discriminado
+    const lines = quote.items.reduce((a, it) => a + (Number(it.subtotal) || 0), 0);
+    const net = Math.round((Number(quote.total) - (Number(quote.taxAmount) || 0)) * 100) / 100;
+    let taxAmount = Number(quote.taxAmount) || 0;
+    if (billing === 'arca' && taxAmount <= 0 && emitter === 'responsable_inscripto') {
+      // Presupuesto viejo sin IVA: se calcula con la alícuota de cada ítem
+      taxAmount = Math.round(quote.items.reduce((a, it) => a + (Number(it.subtotal) || 0) * ((it.ivaRate ?? 21) / 100), 0) * (lines > 0 ? net / lines : 1) * 100) / 100;
+    }
+    if (billing === 'no_arca' || emitter !== 'responsable_inscripto') taxAmount = 0;
+    const total = Math.round((net + taxAmount) * 100) / 100;
+
+    const invoiceType: SalesOrder['invoiceType'] = billing === 'no_arca'
+      ? 'RECIBO_X_NO_ARCA'
+      : emitter !== 'responsable_inscripto'
+        ? 'FACTURA_C'
+        : customerCategory === 'responsable_inscripto' || customerCategory === 'monotributo'
+          ? 'FACTURA_A'
+          : 'FACTURA_B';
 
     const newOrder: SalesOrder = {
       id: `order-from-quote-${quote.id}-${Date.now()}`,
@@ -433,11 +454,11 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
       customerPhone: quote.customerPhone,
       customerEmail: quote.customerEmail,
       customerAddress: quote.customerAddress,
-      billingType: 'arca',
-      invoiceType: 'FACTURA_B',
-      invoiceNumber,
+      billingType: billing,
+      invoiceType,
       date: new Date().toISOString(),
-      status: 'facturado',
+      // Con factura queda pendiente de CAE; el número lo asigna ARCA al autorizar
+      status: 'ingresado',
       deliveryStatus: 'pendiente_entrega',
       deliveryOrders: [],
       paymentStatus: 'pendiente',
@@ -452,11 +473,11 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
         discount: it.discount,
         subtotal: it.subtotal
       })),
-      subtotal: quote.subtotal,
-      taxAmount: quote.taxAmount,
-      total: quote.total,
+      subtotal: net,
+      taxAmount,
+      total,
       paidAmount: 0,
-      notes: `Convertido de Presupuesto ${quote.quoteNumber}. ${quote.notes || ''}`
+      notes: `Convertido de Presupuesto ${quote.quoteNumber} (${billing === 'arca' ? 'con factura ARCA' : 'ingreso de venta sin factura'}). ${quote.notes || ''}`.trim()
     };
 
     await onCreateOrder(newOrder);
