@@ -304,6 +304,7 @@ export interface QuoteItem {
   unitPrice: number;
   discount: number;
   subtotal: number;
+  ivaRate?: number; // alícuota de IVA del producto (21, 10.5, 0)
 }
 
 export interface Quote {
@@ -327,6 +328,10 @@ export interface Quote {
   total: number;
   status: QuoteStatus;
   notes?: string;
+  customerTaxCategory?: TaxCategory;
+  customerCity?: string;
+  customerBalance?: number;
+  sellerName?: string;
   convertedSalesOrderId?: string;
   convertedAt?: string;
   createdBy?: string;

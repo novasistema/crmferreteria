@@ -277,7 +277,13 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
 
   // ARCA Tax calculation: Factura A and Factura B include 21% IVA
   const isFiscalArca = docType === 'factura_a' || docType === 'factura_b';
-  const taxAmount = isFiscalArca ? Math.round(subTotalAfterDiscount * 0.21) : 0;
+  // Presupuesto: precios sin IVA y el IVA discriminado según la alícuota de cada producto
+  const quoteTaxAmount = Math.round(cartItems.reduce((acc, it) => {
+    const lineDiscount = it.discount > 0 ? (1 - it.discount / 100) : 1;
+    const net = it.unitPrice * it.quantity * lineDiscount * (1 - (globalDiscountPct || 0) / 100);
+    return acc + net * ((it.product.ivaRate ?? 21) / 100);
+  }, 0) * 100) / 100;
+  const taxAmount = isFiscalArca ? Math.round(subTotalAfterDiscount * 0.21) : docType === 'presupuesto' ? quoteTaxAmount : 0;
   const grandTotal = docType === 'remito' ? 0 : (subTotalAfterDiscount + taxAmount);
 
   const totalProductsCount = cartItems.reduce((acc, it) => acc + it.quantity, 0);
@@ -317,7 +323,8 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           discount: it.discount,
-          subtotal: Math.round(it.unitPrice * it.quantity * (1 - it.discount / 100))
+          subtotal: Math.round(it.unitPrice * it.quantity * (1 - it.discount / 100) * 100) / 100,
+          ivaRate: it.product.ivaRate ?? 21
         }));
 
         const newQuote: Quote = {
@@ -330,7 +337,11 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
           customerTaxId: currentCustomer ? currentCustomer.taxId : (quickClientTaxId || '00-00000000-0'),
           customerPhone: currentCustomer ? currentCustomer.phone : quickClientPhone,
           customerEmail: currentCustomer ? currentCustomer.email : undefined,
-          customerAddress: currentCustomer ? `${currentCustomer.address}, ${currentCustomer.city}` : undefined,
+          customerAddress: currentCustomer ? currentCustomer.address : undefined,
+          customerCity: currentCustomer ? [currentCustomer.city, currentCustomer.province].filter(Boolean).join(' - ') : undefined,
+          customerTaxCategory: currentCustomer ? currentCustomer.taxCategory : 'consumidor_final',
+          customerBalance: currentCustomer ? currentCustomer.currentBalance : undefined,
+          sellerName: currentCustomer?.sellerName,
           priceList,
           paymentCondition: quotePaymentCondition,
           items: quoteItems,
