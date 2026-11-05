@@ -2,6 +2,9 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { 
   initializeFirestore, 
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  Firestore,
   doc, 
   getDocFromServer,
   collection,
@@ -88,7 +91,21 @@ const firebaseConfig = env.VITE_FIREBASE_PROJECT_ID
 const app = initializeApp(firebaseConfig);
 // ignoreUndefinedProperties: los campos opcionales vacíos (notas, email, etc.) se omiten en lugar de
 // hacer fallar el guardado con "Unsupported field value: undefined"
-export const db = initializeFirestore(app, { ignoreUndefinedProperties: true }, firebaseConfig.firestoreDatabaseId);
+// persistentLocalCache: copia local de la base en el navegador (IndexedDB). Permite seguir trabajando
+// sin internet; los cambios quedan en cola y se sincronizan solos cuando vuelve la conexión.
+const createDb = (): Firestore => {
+  try {
+    return initializeFirestore(
+      app,
+      { ignoreUndefinedProperties: true, localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) },
+      firebaseConfig.firestoreDatabaseId
+    );
+  } catch (err) {
+    console.warn('Caché local no disponible en este navegador; se trabaja solo en línea.', err);
+    return initializeFirestore(app, { ignoreUndefinedProperties: true }, firebaseConfig.firestoreDatabaseId);
+  }
+};
+export const db = createDb();
 export const auth = getAuth(app);
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {

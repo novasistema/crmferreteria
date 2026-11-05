@@ -3,13 +3,14 @@ import {
   collection, 
   onSnapshot, 
   doc, 
-  setDoc, 
-  deleteDoc, 
-  updateDoc, 
-  writeBatch,
   getDocs,
-  deleteField
+  deleteField,
+  increment
 } from 'firebase/firestore';
+// Guardado que no se bloquea sin internet (los cambios se sincronizan al volver la conexión)
+import { setDoc, deleteDoc, updateDoc, writeBatch, startConnectionMonitor, isOffline } from './services/offlineSync';
+import { ConnectionStatus } from './components/ConnectionStatus';
+import { isModuleOn } from './utils/modules';
 import { 
   db, 
   testConnection, 
@@ -37,6 +38,8 @@ import {
   ColorBatch,
   TaxPeriod,
   TaxSettings,
+  WebOrder,
+  EcommerceSettings,
   Product, 
   ProductionOrder, 
   SalesOrder, 
@@ -79,6 +82,7 @@ import { DesktopModule } from './components/DesktopModule';
 import { ProductionModule } from './components/ProductionModule';
 import { ColorRecipesModule } from './components/ColorRecipesModule';
 import { TaxAccountantModule } from './components/TaxAccountantModule';
+import { EcommerceModule } from './components/EcommerceModule';
 import { seedColorRecipesDemoIfNeeded } from './services/colorRecipesDemoSeed';
 import { SalesOrdersModule } from './components/SalesOrdersModule';
 import { SellersModule } from './components/SellersModule';
@@ -161,6 +165,7 @@ export default function App() {
       case 'checks': return 'Cheques & E-Cheqs';
       case 'accounting': return 'Contabilidad & IVA';
       case 'tax_accountant': return 'Contador Interno';
+      case 'ecommerce': return 'Tienda Online';
       case 'profitability': return 'Estado de Resultados';
       case 'employees': return 'Personal & Sueldos';
       case 'installments': return 'Cuotas Internas';
@@ -265,6 +270,7 @@ export default function App() {
   const [standaloneRemitos, setStandaloneRemitos] = useState<DeliveryOrder[]>([]);
   const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>([]);
   const [taxPeriods, setTaxPeriods] = useState<TaxPeriod[]>([]);
+  const [webOrders, setWebOrders] = useState<WebOrder[]>([]);
   const [activeSellerContext, setActiveSellerContext] = useState<Seller | null>(null);
   const [isMobileSellerAppOpen, setIsMobileSellerAppOpen] = useState(false);
 
@@ -309,23 +315,27 @@ export default function App() {
 
     const initializeApp = async () => {
       try {
-        await testConnection();
-        await seedInitialDataIfEmpty();
-        await seedUsersIfEmpty();
-        await seedFinanceAndStaffIfEmpty();
-        await seedSellersIfEmpty();
-        await seedLoyaltyAndInstallmentsIfEmpty();
-        await seedQuotesAndRemitosIfEmpty();
-        await seedColorRecipesDemoIfNeeded();
+        startConnectionMonitor();
+        // Sin internet se salta la carga de datos de ejemplo y se trabaja con la copia local
+        if (!isOffline()) {
+          await Promise.race([testConnection(), new Promise(r => setTimeout(r, 6000))]);
+          await seedInitialDataIfEmpty();
+          await seedUsersIfEmpty();
+          await seedFinanceAndStaffIfEmpty();
+          await seedSellersIfEmpty();
+          await seedLoyaltyAndInstallmentsIfEmpty();
+          await seedQuotesAndRemitosIfEmpty();
+          await seedColorRecipesDemoIfNeeded();
 
-        // Check if official August 2026 catalog with SKUs needs to be synchronized
-        try {
-          const prodSnap = await getDocs(collection(db, 'products'));
-          if (prodSnap.size < 50) {
-            await syncOfficialAugust2026PriceList();
+          // Check if official August 2026 catalog with SKUs needs to be synchronized
+          try {
+            const prodSnap = await getDocs(collection(db, 'products'));
+            if (prodSnap.size < 50) {
+              await syncOfficialAugust2026PriceList();
+            }
+          } catch (prodErr) {
+            console.warn("Catalog synchronization deferred:", prodErr);
           }
-        } catch (prodErr) {
-          console.warn("Catalog synchronization deferred:", prodErr);
         }
 
         // 1. Raw Materials
@@ -439,6 +449,14 @@ export default function App() {
           handleFirestoreError(error, OperationType.GET, 'tax_periods');
         });
         unsubscribes.push(unsubTaxPeriods);
+
+        // 9d. Tienda Online: pedidos web
+        const unsubWebOrders = onSnapshot(collection(db, 'web_orders'), snap => {
+          setWebOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as WebOrder)));
+        }, error => {
+          console.warn('Could not listen to web_orders:', error);
+        });
+        unsubscribes.push(unsubWebOrders);
 
         // 10. Financial Transactions
         const unsubTx = onSnapshot(collection(db, 'financial_transactions'), snap => {
@@ -701,7 +719,7 @@ export default function App() {
         if (mat) {
           const newStock = Math.max(0, mat.currentStock - consumedKg);
           const matRef = doc(db, 'raw_materials', mat.id);
-          batch.update(matRef, { currentStock: newStock });
+          batch.update(matRef, { currentStock: increment(-consumedKg) });
 
           // Kardex entry for material exit
           const movId = `mov-${Date.now()}-${Math.floor(Math.random() * 999)}`;
@@ -731,7 +749,7 @@ export default function App() {
       if (matchingProduct) {
         const prodRef = doc(db, 'products', matchingProduct.id);
         batch.update(prodRef, {
-          stock: matchingProduct.stock + order.packageCount
+          stock: increment(order.packageCount)
         });
 
         // Kardex entry for finished product entry
@@ -783,7 +801,7 @@ export default function App() {
         const mat = rawMaterials.find(m => m.id === line.rawMaterialId);
         if (!mat) return;
         batch.update(doc(db, 'raw_materials', mat.id), {
-          currentStock: Math.max(0, mat.currentStock - line.quantityKg)
+          currentStock: increment(-line.quantityKg)
         });
         const movId = `mov-${Date.now()}-${idx}-${Math.floor(Math.random() * 999)}`;
         batch.set(doc(db, 'inventory_movements', movId), {
@@ -887,7 +905,7 @@ export default function App() {
         if (prod) {
           const newStock = Math.max(0, prod.stock - delItem.quantity);
           const pRef = doc(db, 'products', prod.id);
-          batch.update(pRef, { stock: newStock });
+          batch.update(pRef, { stock: increment(-delItem.quantity) });
 
           // Kardex inventory movement entry with industrial batch and partida traceability
           const movId = `mov-${Date.now()}-${Math.floor(Math.random() * 8999 + 1000)}`;
@@ -991,7 +1009,7 @@ export default function App() {
       // 1. Update customer balance
       const newBalance = Math.max(0, customer.currentBalance - amount);
       const custRef = doc(db, 'customers', customerId);
-      batch.update(custRef, { currentBalance: newBalance });
+      batch.update(custRef, { currentBalance: increment(-amount) });
 
       // 2. Add financial transaction with full receipt information
       const txId = `tx-${Date.now()}`;
@@ -1049,7 +1067,7 @@ export default function App() {
           if (prod) {
             const prodRef = doc(db, 'products', prod.id);
             const updates: Partial<Product> = {
-              stock: (prod.stock || 0) + it.quantity
+              stock: increment(it.quantity) as any
             };
             if (it.unitCost > 0) {
               updates.costListWithoutIva = it.unitCost;
@@ -1078,7 +1096,7 @@ export default function App() {
           if (mat) {
             const matRef = doc(db, 'raw_materials', mat.id);
             batch.update(matRef, {
-              currentStock: mat.currentStock + it.quantity,
+              currentStock: increment(it.quantity),
               unitCost: it.unitCost
             });
 
@@ -1154,7 +1172,7 @@ export default function App() {
           const box = cashboxes.find(b => b.id === destinationId);
           if (box) {
             batch.update(doc(db, 'cashboxes', box.id), {
-              currentBalance: box.currentBalance + chk.amount
+              currentBalance: increment(chk.amount)
             });
             // Record cash movement
             const movId = `mov-chk-${Date.now()}`;
@@ -1206,7 +1224,7 @@ export default function App() {
       if (box) {
         const delta = mov.type === 'ingreso' ? mov.amount : -mov.amount;
         batch.update(doc(db, 'cashboxes', box.id), {
-          currentBalance: Math.max(0, box.currentBalance + delta)
+          currentBalance: increment(delta)
         });
       }
       await batch.commit();
@@ -1223,10 +1241,10 @@ export default function App() {
 
       const batch = writeBatch(db);
       batch.update(doc(db, 'cashboxes', fromId), {
-        currentBalance: Math.max(0, fromBox.currentBalance - amount)
+        currentBalance: increment(-amount)
       });
       batch.update(doc(db, 'cashboxes', toId), {
-        currentBalance: toBox.currentBalance + amount
+        currentBalance: increment(amount)
       });
 
       const movId = `trf-${Date.now()}`;
@@ -1259,7 +1277,7 @@ export default function App() {
 
       if (box) {
         batch.update(doc(db, 'cashboxes', box.id), {
-          currentBalance: Math.max(0, box.currentBalance - amount)
+          currentBalance: increment(-amount)
         });
       }
 
@@ -1314,7 +1332,7 @@ export default function App() {
       const box = cashboxes.find(b => b.id === payment.cashboxId);
       if (box) {
         batch.update(doc(db, 'cashboxes', box.id), {
-          currentBalance: Math.max(0, box.currentBalance - payment.netAmount)
+          currentBalance: increment(-payment.netAmount)
         });
       }
 
@@ -1402,7 +1420,7 @@ export default function App() {
       const targetBox = cashboxes.find(b => b.id === cashboxId) || cashboxes[0];
       if (targetBox) {
         batch.update(doc(db, 'cashboxes', targetBox.id), {
-          currentBalance: targetBox.currentBalance + amount
+          currentBalance: increment(amount)
         });
 
         const movId = `mov-fee-${Date.now()}`;
@@ -1488,7 +1506,7 @@ export default function App() {
 
       // Deduct reward stock
       const rewRef = doc(db, 'loyalty_rewards', rewardId);
-      batch.update(rewRef, { stock: Math.max(0, rew.stock - 1) });
+      batch.update(rewRef, { stock: increment(-1) });
 
       // Save redemption coupon
       batch.set(doc(db, 'loyalty_redemptions', redId), {
@@ -1816,10 +1834,10 @@ export default function App() {
     'desktop', 'reports', 'ai_assistant', 'production', 'color_recipes', 'purchases', 'prices',
     'sales', 'sellers', 'customers', 'installments', 'loyalty', 'logistics',
     'customer_portal', 'finances', 'checks', 'cashboxes', 'arca_fiscal',
-    'accounting', 'tax_accountant', 'profitability', 'employees', 'users', 'settings'
+    'accounting', 'tax_accountant', 'ecommerce', 'profitability', 'employees', 'users', 'settings'
   ];
 
-  const activeModulesCount = ALL_MODULES_LIST.filter(k => companyConfig?.systemModuleToggles?.[k] !== false).length;
+  const activeModulesCount = ALL_MODULES_LIST.filter(k => isModuleOn(companyConfig?.systemModuleToggles, k)).length;
 
   // Calculations for badges
   const productionActiveCount = productionOrders.filter(o => o.status === 'en_proceso' || o.status === 'planificada').length;
@@ -1869,7 +1887,7 @@ export default function App() {
           const cust = customers.find(c => c.id === order.customerId);
           if (cust && order.paymentStatus !== 'pagado') {
             await updateDoc(doc(db, 'customers', cust.id), {
-              currentBalance: cust.currentBalance + order.total
+              currentBalance: increment(order.total)
             });
           }
         }}
@@ -1917,6 +1935,8 @@ export default function App() {
     }
 
     return (
+      <>
+      <ConnectionStatus />
       <LoginScreen
         users={appUsers}
         onLogin={handleLogin}
@@ -1924,11 +1944,13 @@ export default function App() {
         onOpenMobileSellerApp={() => setIsMobileSellerAppOpen(true)}
         config={companyConfig}
       />
+      </>
     );
   }
 
   return (
     <div className="h-screen max-h-screen overflow-hidden bg-slate-100 flex flex-col selection:bg-orange-500 selection:text-white">
+      <ConnectionStatus />
       {/* Top Header Nova Systems */}
       <Header
         activeModule={activeModule}
@@ -1964,7 +1986,7 @@ export default function App() {
         {/* Content View */}
         <main className="flex-1 h-full overflow-y-auto bg-slate-100 relative">
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-            {currentUser?.role !== 'creador' && companyConfig?.systemModuleToggles?.[activeModule] === false ? (
+            {currentUser?.role !== 'creador' && !isModuleOn(companyConfig?.systemModuleToggles, activeModule) ? (
               <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 text-center shadow-xl max-w-md mx-auto my-16 animate-in fade-in">
                 <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto mb-4 text-3xl shadow-xs">
                   ⚠️
@@ -2075,7 +2097,7 @@ export default function App() {
                 const cust = customers.find(c => c.id === order.customerId);
                 if (cust && order.paymentStatus !== 'pagado') {
                   batch.update(doc(db, 'customers', cust.id), {
-                    currentBalance: cust.currentBalance + order.total
+                    currentBalance: increment(order.total)
                   });
                 }
 
@@ -2084,7 +2106,7 @@ export default function App() {
                   const targetBox = cashboxes.find(b => b.id === cashboxId);
                   if (targetBox) {
                     batch.update(doc(db, 'cashboxes', targetBox.id), {
-                      currentBalance: targetBox.currentBalance + order.total,
+                      currentBalance: increment(order.total),
                       updatedAt: new Date().toISOString()
                     });
 
@@ -2113,8 +2135,8 @@ export default function App() {
                   const pointsEarned = Math.floor(order.total * 0.01);
                   if (pointsEarned > 0) {
                     batch.update(doc(db, 'customers', cust.id), {
-                      loyaltyPoints: (cust.loyaltyPoints || 0) + pointsEarned,
-                      loyaltyTotalEarned: (cust.loyaltyTotalEarned || cust.loyaltyPoints || 0) + pointsEarned
+                      loyaltyPoints: increment(pointsEarned),
+                      loyaltyTotalEarned: increment(pointsEarned)
                     });
 
                     const txId = `ltx-sale-${order.id}`;
@@ -2159,7 +2181,7 @@ export default function App() {
                   const prod = products.find(p => p.id === it.productId);
                   if (prod) {
                     const newStock = Math.max(0, prod.stock - it.quantity);
-                    batch.update(doc(db, 'products', prod.id), { stock: newStock });
+                    batch.update(doc(db, 'products', prod.id), { stock: increment(-it.quantity) });
 
                     const movId = `mov-rem-${remito.id}-${it.productId}`;
                     batch.set(doc(db, 'inventory_movements', movId), {
@@ -2405,7 +2427,7 @@ export default function App() {
                     const prod = products.find(p => p.id === it.productId || p.code === it.code);
                     if (prod) {
                       const newStock = (prod.stock || 0) + it.quantity;
-                      const updates: any = { stock: newStock };
+                      const updates: any = { stock: increment(it.quantity) };
                       if (invoice.autoUpdateCosts && it.unitCostCalculated) {
                         updates.unitCost = it.unitCostCalculated;
                         updates.costListWithoutIva = it.unitPrice;
@@ -2434,7 +2456,7 @@ export default function App() {
                   const sup = suppliers.find(s => s.id === invoice.supplierId);
                   if (sup) {
                     const updatedBal = (sup.currentBalance || 0) - invoice.total;
-                    batch.update(doc(db, 'suppliers', sup.id), { currentBalance: updatedBal });
+                    batch.update(doc(db, 'suppliers', sup.id), { currentBalance: increment(-invoice.total) });
                   }
                 }
 
@@ -2537,6 +2559,86 @@ export default function App() {
               onSaveCashbox={handleSaveCashbox}
               onAddMovement={handleAddCashMovement}
               onTransferBetweenCashboxes={handleTransferBetweenCashboxes}
+            />
+          )}
+
+          {activeModule === 'ecommerce' && (
+            <EcommerceModule
+              config={companyConfig}
+              products={products}
+              orders={webOrders}
+              currentUserRole={currentUser?.role}
+              onSaveSettings={async (settings: EcommerceSettings) => {
+                const clean = JSON.parse(JSON.stringify(settings));
+                try {
+                  await setDoc(doc(db, 'company_config', 'main_config'), { ecommerce: clean }, { merge: true });
+                  setCompanyConfig(prev => prev ? { ...prev, ecommerce: clean } : prev);
+                } catch (error) { handleFirestoreError(error, OperationType.WRITE, 'company_config'); }
+              }}
+              onUpdateProducts={async (ids, patch) => {
+                try {
+                  for (let i = 0; i < ids.length; i += 400) {
+                    const batch = writeBatch(db);
+                    ids.slice(i, i + 400).forEach(id => batch.update(doc(db, 'products', id), patch as any));
+                    await batch.commit();
+                  }
+                } catch (error) { handleFirestoreError(error, OperationType.UPDATE, 'products'); }
+              }}
+              onUpdateOrder={async (id, patch) => {
+                try { await updateDoc(doc(db, 'web_orders', id), patch as any); }
+                catch (error) { handleFirestoreError(error, OperationType.UPDATE, 'web_orders'); }
+              }}
+              onConvertToSale={async (order, billing) => {
+                const digits = (order.customerTaxId || '').replace(/\D/g, '');
+                const phoneDigits = (order.customerPhone || '').replace(/\D/g, '').slice(-8);
+                const customer = customers.find(c =>
+                  (digits && (c.taxId || '').replace(/\D/g, '') === digits) ||
+                  (phoneDigits.length >= 6 && (c.phone || '').replace(/\D/g, '').endsWith(phoneDigits))
+                );
+                const emitter = companyConfig?.taxSettings?.ivaCondition || companyConfig?.arcaTaxCondition || 'responsable_inscripto';
+                const category = customer?.taxCategory || 'consumidor_final';
+                const invoiceType: SalesOrder['invoiceType'] = billing === 'no_arca'
+                  ? 'RECIBO_X_NO_ARCA'
+                  : emitter !== 'responsable_inscripto' ? 'FACTURA_C'
+                  : category === 'responsable_inscripto' || category === 'monotributo' ? 'FACTURA_A' : 'FACTURA_B';
+                const id = `order-web-${order.id}`;
+                const salesOrder: SalesOrder = {
+                  id,
+                  orderNumber: order.number,
+                  customerId: customer?.id || 'occasional',
+                  customerName: customer?.businessName || order.customerName,
+                  customerTaxId: customer?.taxId || order.customerTaxId || '',
+                  customerPhone: order.customerPhone,
+                  customerEmail: order.customerEmail,
+                  customerAddress: [order.customerAddress, order.customerCity].filter(Boolean).join(', ') || (order.delivery === 'retiro' ? 'Retira en el local' : ''),
+                  billingType: billing,
+                  invoiceType,
+                  date: new Date().toISOString(),
+                  status: 'ingresado',
+                  deliveryStatus: 'pendiente_entrega',
+                  deliveryOrders: [],
+                  paymentStatus: order.status === 'pagado' ? 'pagado' : 'pendiente',
+                  paidAmount: order.status === 'pagado' ? order.total : 0,
+                  items: order.items.map(it => ({
+                    productId: it.productId,
+                    productName: `${it.name} (${it.presentation})`,
+                    code: it.code,
+                    presentation: it.presentation,
+                    quantity: it.quantity,
+                    deliveredQuantity: 0,
+                    unitPrice: it.unitPrice,
+                    discount: 0,
+                    subtotal: it.subtotal
+                  })),
+                  // Con factura: neto + IVA (+ envío). Sin factura: el mismo importe que pagó el cliente.
+                  subtotal: billing === 'arca' ? order.subtotal + order.shippingCost : order.total,
+                  taxAmount: billing === 'arca' ? order.taxAmount : 0,
+                  total: order.total,
+                  notes: `Pedido web ${order.number} · ${order.delivery === 'envio' ? 'Envío' : 'Retiro'} · Pago: ${order.payment}${order.customerNotes ? ` · ${order.customerNotes}` : ''}`
+                };
+                await setDoc(doc(db, 'sales_orders', id), salesOrder);
+                return id;
+              }}
             />
           )}
 

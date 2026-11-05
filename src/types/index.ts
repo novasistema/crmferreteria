@@ -478,7 +478,7 @@ export interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  type: 'pago_pendiente' | 'pedido_listo' | 'produccion_progreso' | 'despacho_en_camino' | 'stock_bajo';
+  type: 'pago_pendiente' | 'pedido_listo' | 'produccion_progreso' | 'despacho_en_camino' | 'stock_bajo' | 'pedido_web';
   targetEntityId?: string;
   isRead: boolean;
   createdAt: string;
@@ -515,6 +515,78 @@ export interface CompanyConfig {
   arcaTaEnc?: string; // ticket de acceso vigente, cifrado
   arcaLastTest?: ArcaConnectionTest;
   taxSettings?: TaxSettings; // Contador Interno
+  ecommerce?: EcommerceSettings; // Tienda Online
+}
+
+// --- TIENDA ONLINE (E-COMMERCE) ---
+export interface EcommerceSettings {
+  storeOpen: boolean;
+  storeName?: string;
+  slogan?: string;
+  bannerText?: string;
+  accentColor: string;
+  whatsapp?: string;
+  priceList: PriceListType;
+  showPricesWithIva: boolean; // precio final con IVA incluido
+  showStock: boolean;
+  hideOutOfStock: boolean;
+  minOrderAmount: number;
+  pickupEnabled: boolean;
+  pickupAddress?: string;
+  shippingEnabled: boolean;
+  shippingCost: number;
+  freeShippingFrom: number;
+  shippingNote?: string;
+  transferEnabled: boolean;
+  transferAlias?: string;
+  transferCbu?: string;
+  transferHolder?: string;
+  transferBank?: string;
+  cashEnabled: boolean;
+  mercadoPagoEnabled: boolean;
+  mercadoPagoTokenEnc?: string; // access token cifrado en el servidor
+  mercadoPagoAccount?: string; // nombre de la cuenta (para mostrar)
+}
+
+export type WebOrderStatus = 'nuevo' | 'confirmado' | 'pagado' | 'preparando' | 'enviado' | 'entregado' | 'cancelado';
+export type WebOrderPayment = 'transferencia' | 'efectivo' | 'mercadopago';
+
+export interface WebOrderItem {
+  productId: string;
+  code: string;
+  name: string;
+  presentation: string;
+  quantity: number;
+  unitPrice: number; // sin IVA
+  ivaRate: number;
+  subtotal: number; // sin IVA
+}
+
+export interface WebOrder {
+  id: string;
+  number: string; // WEB-261105-0001
+  createdAt: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  customerTaxId?: string;
+  customerAddress?: string;
+  customerCity?: string;
+  customerNotes?: string;
+  items: WebOrderItem[];
+  subtotal: number;
+  taxAmount: number;
+  shippingCost: number;
+  total: number;
+  delivery: 'retiro' | 'envio';
+  payment: WebOrderPayment;
+  status: WebOrderStatus;
+  mpPreferenceId?: string;
+  mpPaymentId?: string;
+  mpStatus?: string;
+  salesOrderId?: string;
+  internalNotes?: string;
+  updatedAt?: string;
 }
 
 // --- CONTADOR INTERNO (IVA + Ingresos Brutos) ---
@@ -630,6 +702,7 @@ export type ModuleKey =
   | 'arca_fiscal'
   | 'accounting'
   | 'tax_accountant'
+  | 'ecommerce'
   | 'profitability'
   | 'employees'
   | 'logistics'

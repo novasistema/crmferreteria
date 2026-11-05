@@ -46,6 +46,7 @@ import {
   Calculator
 } from 'lucide-react';
 import { NotificationItem, ModuleKey, CompanyConfig, AppUser, Seller } from '../types';
+import { isModuleOn as isModuleEnabled } from '../utils/modules';
 
 interface HeaderProps {
   activeModule: ModuleKey;
@@ -110,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Módulos de planta: se muestran según el perfil del Control Maestro (el creador ve todo)
   const isCreatorUser = currentUser?.role === 'creador';
-  const isModuleOn = (k: ModuleKey) => config?.systemModuleToggles?.[k] !== false;
+  const isModuleOn = (k: ModuleKey) => isModuleEnabled(config?.systemModuleToggles, k);
   const factoryMenuItems = ([
     { key: 'production' as ModuleKey, label: 'Producción & Fórmulas', icon: Factory },
     { key: 'color_recipes' as ModuleKey, label: 'Recetas de Color', icon: Palette }
@@ -258,7 +259,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => toggleDropdown('sales')}
                 className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
-                  activeDropdown === 'sales' || ['sales', 'customers', 'sellers', 'arca_fiscal'].includes(activeModule)
+                  activeDropdown === 'sales' || ['sales', 'customers', 'sellers', 'arca_fiscal', 'ecommerce'].includes(activeModule)
                     ? 'bg-slate-800 text-orange-400 font-bold'
                     : 'hover:bg-slate-800/80 hover:text-white text-slate-300'
                 }`}
@@ -321,6 +322,24 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                   </button>
 
+                  {(isCreatorUser || isModuleOn('ecommerce')) && (
+                    <button
+                      onClick={() => handleNavigate('ecommerce')}
+                      className={`w-full text-left px-3.5 py-2 flex items-center justify-between gap-2.5 transition-colors group ${
+                        activeModule === 'ecommerce'
+                          ? 'text-orange-400 bg-orange-950/40 font-bold hover:bg-orange-950/70'
+                          : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <ShoppingCart className={`w-4 h-4 transition-colors shrink-0 ${activeModule === 'ecommerce' ? 'text-orange-500' : 'text-pink-400 group-hover:text-white'}`} />
+                        <span className="truncate">Tienda Online</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-pink-950/60 border border-pink-500/30 text-pink-300 shrink-0">
+                        {!isModuleOn('ecommerce') ? 'OFF' : 'WEB'}
+                      </span>
+                    </button>
+                  )}
                   <div className="my-1 border-t border-slate-800/80"></div>
 
                   <button
@@ -1103,6 +1122,14 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 Vendedores & Rutas
               </button>
+              {(isCreatorUser || isModuleOn('ecommerce')) && (
+                <button
+                  onClick={() => { handleNavigate('ecommerce'); setIsMobileNavOpen(false); }}
+                  className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-pink-300 font-semibold"
+                >
+                  Tienda Online
+                </button>
+              )}
               <button
                 onClick={() => { handleNavigate('arca_fiscal'); setIsMobileNavOpen(false); }}
                 className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-slate-200"

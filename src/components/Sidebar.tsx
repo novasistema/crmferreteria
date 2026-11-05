@@ -31,6 +31,7 @@ import {
   Palette
 } from 'lucide-react';
 import { ModuleKey, UserRole } from '../types';
+import { isModuleOn } from '../utils/modules';
 
 interface SidebarProps {
   activeModule: ModuleKey;
@@ -314,6 +315,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Cuánto pagar de IVA e IIBB, VEP y vencimientos'
         },
         {
+          key: 'ecommerce',
+          label: 'Tienda Online',
+          icon: ShoppingCart,
+          badge: 'Web',
+          badgeColor: 'bg-pink-900/60 text-pink-300 border border-pink-700/50',
+          desc: 'Pedidos web, productos publicados y Mercado Pago'
+        },
+        {
           key: 'profitability',
           label: 'Estado de Resultados',
           icon: TrendingUp,
@@ -368,7 +377,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return true; // Creator always has full visibility
           }
           // If explicitly set to false, regular users cannot see or access it
-          return systemModuleToggles[item.key] !== false;
+          return isModuleOn(systemModuleToggles, item.key);
         });
 
         // Step 2: Filter by RBAC allowedModules (if provided and non-empty)
@@ -565,7 +574,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
-                          {currentUserRole === 'creador' && systemModuleToggles[item.key] === false && (
+                          {currentUserRole === 'creador' && !isModuleOn(systemModuleToggles, item.key) && (
                             <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800/80" title="Módulo desactivado para usuarios regulares">
                               Oculto
                             </span>

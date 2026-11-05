@@ -28,6 +28,7 @@ export const TabsBar: React.FC<TabsBarProps> = ({
       case 'desktop':
         return <LayoutDashboard className="w-3.5 h-3.5 shrink-0" />;
       case 'sales':
+      case 'ecommerce':
         return <ShoppingCart className="w-3.5 h-3.5 shrink-0" />;
       case 'inventory':
       case 'production':

@@ -39,6 +39,7 @@ import {
   Receipt as ReceiptIcon
 } from 'lucide-react';
 import { ModuleKey } from '../types';
+import { isModuleOn, OPT_IN_MODULES } from '../utils/modules';
 
 interface CreatorModuleControlModalProps {
   isOpen: boolean;
@@ -235,6 +236,14 @@ const ALL_MODULES_METADATA: ModuleMeta[] = [
     desc: 'Libro IVA Ventas, IVA Compras, retenciones y exportación de datos para Declaración F.2002.'
   },
   {
+    key: 'ecommerce',
+    label: 'Tienda Online (E-commerce)',
+    category: 'sales',
+    icon: ShoppingCart,
+    desc: 'Tienda web pública con carrito, pedidos online, Mercado Pago o transferencia, y panel de pedidos web. Se vende como agregado de la suscripción: apagado por defecto.',
+    badge: 'Suscripción'
+  },
+  {
     key: 'tax_accountant',
     label: 'Contador Interno (IVA & IIBB)',
     category: 'finances',
@@ -309,7 +318,7 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
 
   const isModuleActive = (key: ModuleKey): boolean => {
     // If not explicitly set to false, default is true (active)
-    return systemModuleToggles[key] !== false;
+    return isModuleOn(systemModuleToggles, key);
   };
 
   const activeCount = ALL_MODULES_METADATA.filter(m => isModuleActive(m.key)).length;
@@ -331,6 +340,7 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
     try {
       const updates: Partial<Record<ModuleKey, boolean>> = {};
       ALL_MODULES_METADATA.forEach(m => {
+        if (OPT_IN_MODULES.includes(m.key)) return; // los agregados de suscripción se activan uno por uno
         updates[m.key] = true;
       });
       await onBatchToggleModules(updates);
@@ -398,7 +408,7 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
   ];
 
   const currentProfileId = BUSINESS_PROFILES.find(p =>
-    ALL_MODULES_METADATA.every(m => isModuleActive(m.key) === !p.off.includes(m.key))
+    ALL_MODULES_METADATA.filter(m => !OPT_IN_MODULES.includes(m.key)).every(m => isModuleActive(m.key) === !p.off.includes(m.key))
   )?.id;
 
   const handleApplyProfile = async (profileId: string) => {
@@ -411,6 +421,7 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
     try {
       const updates: Partial<Record<ModuleKey, boolean>> = {};
       ALL_MODULES_METADATA.forEach(m => {
+        if (OPT_IN_MODULES.includes(m.key)) return; // los agregados de suscripción se activan aparte
         updates[m.key] = !profile.off.includes(m.key);
       });
       await onBatchToggleModules(updates);

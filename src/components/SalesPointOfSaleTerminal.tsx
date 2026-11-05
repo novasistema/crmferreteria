@@ -449,12 +449,13 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
       
       const isArca = result.billingType === 'arca';
       const docLetter = result.docType === 'factura_a' ? 'A' : result.docType === 'factura_b' ? 'B' : result.docType === 'factura_c' ? 'C' : 'X';
-      const invoiceNumber = isArca 
-        ? `FAC-${docLetter}-0004-${String(Math.floor(Math.random() * 89999999 + 10000000)).padStart(8, '0')}`
+      // Con factura ARCA el número y el CAE los asigna ARCA al autorizar (en Facturación ARCA).
+      // Así la venta se puede registrar aunque no haya internet y se factura después.
+      const invoiceNumber = isArca
+        ? undefined
         : `TKT-X-0001-${String(Math.floor(Math.random() * 89999999 + 10000000)).padStart(8, '0')}`;
-      
-      const cae = isArca ? String(Math.floor(Math.random() * 89999999999999 + 10000000000000)) : undefined;
-      const caeVto = isArca ? new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0] : undefined;
+      const cae: string | undefined = undefined;
+      const caeVto: string | undefined = undefined;
 
       const saleItems: SalesOrderItem[] = cartItems.map(it => ({
         productId: it.product.id,
@@ -504,7 +505,9 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
 
       setSuccessBanner({
         title: 'Venta Registrada Exitosamente',
-        message: `${result.docType === 'ingreso_venta' ? 'Ingreso de Venta' : result.docType.toUpperCase().replace('_', ' ')} ${invoiceNumber} por $${grandTotal.toLocaleString('es-AR')}. Forma de pago: ${result.paymentMethod.toUpperCase().replace('_', ' ')}.`,
+        message: isArca
+          ? `Factura ${docLetter} por $${grandTotal.toLocaleString('es-AR')} registrada. Queda pendiente de autorizar en Facturación ARCA (CAE). Forma de pago: ${result.paymentMethod.toUpperCase().replace('_', ' ')}.`
+          : `${result.docType === 'ingreso_venta' ? 'Ingreso de Venta' : result.docType.toUpperCase().replace('_', ' ')} ${invoiceNumber} por $${grandTotal.toLocaleString('es-AR')}. Forma de pago: ${result.paymentMethod.toUpperCase().replace('_', ' ')}.`,
         docId: newSaleOrder.id,
         type: 'venta'
       });
