@@ -1262,9 +1262,9 @@ export default function App() {
   // Guarda una venta (POS, Modo Móvil, pedidos): saldo del cliente, caja, puntos y stock
   const handleCreateSalesOrder = async (order: SalesOrder, cashboxId?: string, paymentMethod?: string) => {
     const batch = writeBatch(db);
-    batch.set(doc(db, 'sales_orders', order.id), order);
-
     const cust = customers.find(c => c.id === order.customerId);
+    batch.set(doc(db, 'sales_orders', order.id), { ...order, chargedToAccount: Boolean(cust && order.paymentStatus !== 'pagado') });
+
     if (cust && order.paymentStatus !== 'pagado') {
       batch.update(doc(db, 'customers', cust.id), {
         currentBalance: increment(order.total)
@@ -1956,6 +1956,190 @@ export default function App() {
     return newVoucher;
   };
 
+  // --- ANULACIÓN DE VENTAS ---
+  // Revierte todo lo que generó la venta: nota de crédito en ARCA (si tenía CAE), stock entregado,
+  // deuda en cuenta corriente o devolución de dinero, y los puntos de fidelización.
+  const handleCancelSalesOrder = async (
+    orderId: string,
+    opts: { reason: string; refund: 'cuenta' | 'caja' | 'externo'; cashboxId?: string }
+  ): Promise<string> => {
+    const order = salesOrders.find(o => o.id === orderId);
+    if (!order) throw new Error('Venta no encontrada.');
+    if (order.status === 'cancelado') throw new Error('Esta venta ya está anulada.');
+    if (!opts.reason.trim()) throw new Error('Indicá el motivo de la anulación.');
+    const cust = customers.find(c => c.id === order.customerId);
+    const now = new Date().toISOString();
+    const userName = currentUser?.name || 'Administración';
+    const summary: string[] = [];
+
+    // 1. Nota de crédito electrónica (antes que nada: si ARCA la rechaza, no se toca nada más)
+    let creditNote: { number: string; cae: string } | null = null;
+    const invMatch = /^FACTURA_([ABC])$/.exec(order.invoiceType || '');
+    if (order.cae && invMatch) {
+      const cfg = companyConfig;
+      if (!cfg || !isArcaReady(cfg)) {
+        throw new Error('Esta venta tiene factura electrónica y para anularla hay que emitir una nota de crédito, pero la conexión con ARCA no está lista (Control Maestro → ARCA).');
+      }
+      const letter = invMatch[1] as 'A' | 'B' | 'C';
+      const [pvStr, nroStr] = (order.invoiceNumber || '').split('-');
+      const origPv = Number(pvStr) || cfg.arcaPointOfSale;
+      const origNro = Number(nroStr);
+      if (!origNro) throw new Error('No se pudo leer el número de la factura original para asociarla a la nota de crédito.');
+      const origVoucher = arcaVouchers.find(v => v.associatedOrderId === order.id && v.voucherType === `FACTURA_${letter}`);
+      const receptorCategory: TaxCategory = origVoucher?.taxCategory || cust?.taxCategory || 'consumidor_final';
+      const docDigits = (origVoucher?.customerTaxId || order.customerTaxId || cust?.taxId || '').replace(/\D/g, '');
+      let docTipo = 99;
+      let docNro = '0';
+      if (docDigits.length === 11) { docTipo = 80; docNro = docDigits; }
+      else if (docDigits.length >= 7 && docDigits.length <= 8) { docTipo = 96; docNro = docDigits; }
+      const condicionIvaReceptorId = ({ responsable_inscripto: 1, monotributo: 6, exento: 4, consumidor_final: 5 } as const)[receptorCategory];
+      const total = Math.round((origVoucher?.total ?? order.total) * 100) / 100;
+      const neto = letter === 'C' ? total : Math.round((origVoucher?.netAmount ?? total / 1.21) * 100) / 100;
+      const iva = letter === 'C' ? 0 : Math.round((total - neto) * 100) / 100;
+      const cbteTipo = { A: 3, B: 8, C: 13 }[letter];
+
+      const r = await callArca('invoice', {
+        env: cfg.arcaEnvironment,
+        cuit: cfg.cuit,
+        keyEnc: cfg.arcaKeyEnc,
+        certPem: cfg.arcaCertPem,
+        taEnc: cfg.arcaTaEnc,
+        invoice: {
+          ptoVta: cfg.arcaPointOfSale,
+          cbteTipo,
+          docTipo,
+          docNro,
+          condicionIvaReceptorId,
+          impTotal: total,
+          impNeto: neto,
+          impIva: iva,
+          iva: letter === 'C' ? [] : [{ id: 5, baseImp: neto, importe: iva }],
+          cbtesAsoc: [{
+            tipo: { A: 1, B: 6, C: 11 }[letter],
+            ptoVta: origPv,
+            nro: origNro,
+            cuit: cfg.cuit,
+            fecha: (origVoucher?.date || order.date || '').slice(0, 10)
+          }]
+        }
+      });
+      if (r.taEnc && r.taEnc !== cfg.arcaTaEnc) {
+        setDoc(doc(db, 'company_config', 'main_config'), { arcaTaEnc: r.taEnc }, { merge: true }).catch(() => {});
+        setCompanyConfig(prev => prev ? { ...prev, arcaTaEnc: r.taEnc } : prev);
+      }
+      if (!r.ok) throw new Error(`ARCA rechazó la nota de crédito: ${r.error || 'sin detalle'}. La venta NO se anuló.`);
+
+      const ncNumber = `${String(cfg.arcaPointOfSale).padStart(5, '0')}-${String(r.number).padStart(8, '0')}`;
+      const qrData = {
+        ver: 1, fecha: r.date, cuit: Number(cfg.cuit.replace(/\D/g, '')), ptoVta: cfg.arcaPointOfSale,
+        tipoCmp: cbteTipo, nroCmp: r.number, importe: total, moneda: 'PES', ctz: 1,
+        tipoDocRec: docTipo, nroDocRec: Number(docNro), tipoCodAut: 'E', codAut: Number(r.cae)
+      };
+      const ncVoucher: ArcaElectronicVoucher = {
+        id: `arc-nc-${Date.now()}`,
+        voucherNumber: ncNumber,
+        voucherType: `NOTA_CREDITO_${letter}`,
+        pointOfSale: cfg.arcaPointOfSale,
+        date: r.date,
+        customerId: order.customerId,
+        customerName: order.customerName,
+        customerTaxId: docNro === '0' ? '' : docNro,
+        taxCategory: receptorCategory,
+        netAmount: neto,
+        iva21: iva,
+        total,
+        cae: r.cae,
+        caeVto: r.caeVto,
+        afipQrUrl: `https://www.afip.gob.ar/fe/qr/?p=${btoa(JSON.stringify(qrData))}`,
+        status: 'autorizado',
+        environment: cfg.arcaEnvironment,
+        associatedOrderId: order.id,
+        createdAt: now
+      };
+      await setDoc(doc(db, 'arca_vouchers', ncVoucher.id), ncVoucher);
+      creditNote = { number: ncNumber, cae: r.cae };
+      summary.push(`Nota de crédito ${letter} ${ncNumber} autorizada (CAE ${r.cae}).`);
+    }
+
+    const batch = writeBatch(db);
+
+    // 2. Estado de la venta
+    batch.update(doc(db, 'sales_orders', order.id), {
+      status: 'cancelado',
+      cancelledAt: now,
+      cancelledBy: userName,
+      cancelReason: opts.reason.trim(),
+      ...(creditNote ? { creditNoteNumber: creditNote.number, creditNoteCae: creditNote.cae } : {})
+    });
+
+    // 3. Stock: vuelve lo que efectivamente salió
+    let unitsBack = 0;
+    order.items.forEach((it, idx) => {
+      const qty = it.deliveredQuantity != null ? Number(it.deliveredQuantity) || 0 : order.status === 'entregado' ? Number(it.quantity) || 0 : 0;
+      if (qty <= 0 || !products.some(p => p.id === it.productId)) return;
+      unitsBack += qty;
+      batch.update(doc(db, 'products', it.productId), { stock: increment(qty) });
+      const movId = `mov-anul-${order.id}-${idx}`;
+      batch.set(doc(db, 'inventory_movements', movId), {
+        id: movId,
+        itemType: 'product',
+        itemId: it.productId,
+        itemName: it.productName,
+        movementType: 'ajuste_manual',
+        quantity: qty,
+        unit: 'unidades',
+        reference: `Anulación venta ${order.orderNumber} - ${order.customerName}`,
+        batchNumber: it.batchNumber || '',
+        user: userName,
+        date: now
+      });
+    });
+    if (unitsBack > 0) summary.push(`${unitsBack} unidades devueltas al stock.`);
+
+    // 4. Dinero
+    const inAccount = order.chargedToAccount === true || (order.chargedToAccount === undefined && order.paymentStatus !== 'pagado');
+    if (cust && inAccount) {
+      batch.update(doc(db, 'customers', cust.id), { currentBalance: increment(-order.total) });
+      summary.push(`Se descontaron $${order.total.toLocaleString('es-AR')} de la cuenta corriente del cliente.`);
+    } else if (order.paymentStatus === 'pagado') {
+      const paid = Number(order.paidAmount) || order.total;
+      if (opts.refund === 'caja') {
+        const box = cashboxes.find(b => b.id === opts.cashboxId);
+        if (!box) throw new Error('Elegí la caja de la que sale la devolución.');
+        batch.update(doc(db, 'cashboxes', box.id), { currentBalance: increment(-paid), updatedAt: now });
+        const cmId = `cmov-anul-${order.id}`;
+        batch.set(doc(db, 'cash_movements', cmId), {
+          id: cmId,
+          cashboxId: box.id,
+          cashboxName: box.name,
+          type: 'egreso',
+          amount: paid,
+          category: 'otros_egresos',
+          concept: `Devolución por anulación de venta ${order.orderNumber} - ${order.customerName}`,
+          date: loyaltyToday(),
+          referenceNumber: creditNote?.number || order.invoiceNumber || order.orderNumber,
+          user: userName,
+          createdAt: now
+        });
+        summary.push(`Devolución de $${paid.toLocaleString('es-AR')} registrada en la caja ${box.name}.`);
+      } else if (opts.refund === 'cuenta' && cust) {
+        batch.update(doc(db, 'customers', cust.id), { currentBalance: increment(-paid) });
+        summary.push(`Quedaron $${paid.toLocaleString('es-AR')} a favor del cliente en su cuenta corriente.`);
+      } else {
+        summary.push('La devolución del dinero se hizo por fuera del sistema.');
+      }
+    }
+
+    await batch.commit();
+
+    // 5. Puntos de fidelización
+    const hadPoints = loyaltyTransactions.some(t => t.id === `ltx-sale-${order.id}`);
+    await reverseLoyaltyForOrder(order.id);
+    if (hadPoints) summary.push('Se descontaron los puntos que había generado la venta.');
+
+    return summary.join('\n') || 'Venta anulada.';
+  };
+
   const handleLogin = (user: AppUser) => {
     setCurrentUser(user);
     localStorage.setItem('colorear_current_user', JSON.stringify(user));
@@ -2142,8 +2326,8 @@ export default function App() {
         onSetActiveSellerContext={setActiveSellerContext}
         onCloseMobileApp={() => setIsMobileSellerAppOpen(false)}
         onCreateSalesOrder={async (order) => {
-          await setDoc(doc(db, 'sales_orders', order.id), order);
           const cust = customers.find(c => c.id === order.customerId);
+          await setDoc(doc(db, 'sales_orders', order.id), { ...order, chargedToAccount: Boolean(cust && order.paymentStatus !== 'pagado') });
           if (cust && order.paymentStatus !== 'pagado') {
             await updateDoc(doc(db, 'customers', cust.id), {
               currentBalance: increment(order.total)
@@ -2355,6 +2539,7 @@ export default function App() {
               onCreateOrder={handleCreateSalesOrder}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onDeliverOrderItems={handleDeliverOrderItems}
+              onCancelOrder={handleCancelSalesOrder}
               onRecordOrderPayment={async (orderId, amount) => {
                 await updateDoc(doc(db, 'sales_orders', orderId), {
                   paymentStatus: 'pagado',

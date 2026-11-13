@@ -370,6 +370,12 @@ export interface SalesOrder {
   total: number;
   notes?: string;
   paidAmount?: number;
+  chargedToAccount?: boolean; // true si la venta se cargó a la cuenta corriente del cliente
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancelReason?: string;
+  creditNoteNumber?: string;
+  creditNoteCae?: string;
 }
 
 export interface Invoice {
@@ -1017,7 +1023,7 @@ export interface CashRegisterSession {
 export interface ArcaElectronicVoucher {
   id: string;
   voucherNumber: string; // ej: 0004-00002819
-  voucherType: 'FACTURA_A' | 'FACTURA_B' | 'FACTURA_C' | 'REMITO_R' | 'PRESUPUESTO_X' | 'NOTA_CREDITO_A' | 'NOTA_CREDITO_B';
+  voucherType: 'FACTURA_A' | 'FACTURA_B' | 'FACTURA_C' | 'REMITO_R' | 'PRESUPUESTO_X' | 'NOTA_CREDITO_A' | 'NOTA_CREDITO_B' | 'NOTA_CREDITO_C';
   pointOfSale: number;
   date: string;
   customerId: string;

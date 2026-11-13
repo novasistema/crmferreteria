@@ -71,6 +71,7 @@ interface SalesOrdersModuleProps {
   onUpdateOrderStatus: (orderId: string, status: SalesOrderStatus, additionalData?: Partial<SalesOrder>) => Promise<void>;
   onDeliverOrderItems: (orderId: string, delivery: DeliveryOrder) => Promise<void>;
   onRecordOrderPayment: (orderId: string, amount: number) => Promise<void>;
+  onCancelOrder?: (orderId: string, opts: { reason: string; refund: 'cuenta' | 'caja' | 'externo'; cashboxId?: string }) => Promise<string>;
   onSaveQuote?: (quote: Quote) => Promise<void>;
   onDeleteQuote?: (quoteId: string) => Promise<void>;
   onUpdateQuoteStatus?: (quoteId: string, status: QuoteStatus) => Promise<void>;
@@ -91,6 +92,7 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
   onUpdateOrderStatus,
   onDeliverOrderItems,
   onRecordOrderPayment,
+  onCancelOrder,
   onSaveQuote,
   onDeleteQuote,
   onUpdateQuoteStatus,
@@ -122,6 +124,45 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
 
   // Modals for partial delivery & viewing documents
   const [deliveryModalOrder, setDeliveryModalOrder] = useState<SalesOrder | null>(null);
+
+  // Anulación de ventas
+  const [cancelOrder, setCancelOrder] = useState<SalesOrder | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelRefund, setCancelRefund] = useState<'cuenta' | 'caja' | 'externo'>('caja');
+  const [cancelCashboxId, setCancelCashboxId] = useState('');
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelDone, setCancelDone] = useState<string | null>(null);
+
+  const openCancelModal = (order: SalesOrder) => {
+    setCancelOrder(order);
+    setCancelReason('');
+    setCancelRefund('caja');
+    setCancelCashboxId(cashboxes.find(b => (b as any).status !== 'cerrada')?.id || cashboxes[0]?.id || '');
+    setCancelError(null);
+    setCancelDone(null);
+  };
+
+  const cancelGoesToAccount = (o: SalesOrder) =>
+    o.chargedToAccount === true || (o.chargedToAccount === undefined && o.paymentStatus !== 'pagado');
+
+  const handleConfirmCancel = async () => {
+    if (!cancelOrder || !onCancelOrder) return;
+    if (!cancelReason.trim()) {
+      setCancelError('Escribí el motivo de la anulación.');
+      return;
+    }
+    setCancelBusy(true);
+    setCancelError(null);
+    try {
+      const msg = await onCancelOrder(cancelOrder.id, { reason: cancelReason, refund: cancelRefund, cashboxId: cancelCashboxId });
+      setCancelDone(msg);
+    } catch (err: any) {
+      setCancelError(err?.message || 'No se pudo anular la venta.');
+    } finally {
+      setCancelBusy(false);
+    }
+  };
   const [viewDeliveriesOrder, setViewDeliveriesOrder] = useState<SalesOrder | null>(null);
   const [viewingDoc, setViewingDoc] = useState<{ 
     order: SalesOrder; 
@@ -1168,6 +1209,14 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
                             {order.invoiceNumber}
                           </span>
                         )}
+                        {order.status === 'cancelado' && (
+                          <span
+                            className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[11px]"
+                            title={order.cancelReason ? `Motivo: ${order.cancelReason}` : undefined}
+                          >
+                            ANULADA{order.creditNoteNumber ? ` · NC ${order.creditNoteNumber}` : ''}
+                          </span>
+                        )}
                         <span className="text-xs text-slate-500">
                           {new Date(order.date).toLocaleDateString('es-AR')}
                         </span>
@@ -1252,8 +1301,21 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
                         )}
                       </div>
 
-                      <div>
-                        {stats.pending > 0 ? (
+                      <div className="flex items-center gap-2">
+                        {onCancelOrder && order.status !== 'cancelado' && (
+                          <button
+                            onClick={() => openCancelModal(order)}
+                            className="flex items-center gap-1 text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg font-bold border border-rose-200"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Anular</span>
+                          </button>
+                        )}
+                        {order.status === 'cancelado' ? (
+                          <span className="text-xs font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+                            Venta anulada
+                          </span>
+                        ) : stats.pending > 0 ? (
                           <button
                             onClick={() => handleOpenDeliveryModal(order)}
                             className="bg-[#d31627] hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 shadow-xs transition-transform active:scale-95"
@@ -1272,6 +1334,109 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
                   </div>
                 );
               })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ANULAR VENTA */}
+      {cancelOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-rose-700">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="font-black text-slate-900">Anular venta {cancelOrder.orderNumber}</h3>
+              </div>
+              <button onClick={() => setCancelOrder(null)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {cancelDone ? (
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold">
+                  Venta anulada correctamente
+                </div>
+                <ul className="text-xs text-slate-700 space-y-1 list-disc pl-5">
+                  {cancelDone.split('\n').map((l, i) => <li key={i}>{l}</li>)}
+                </ul>
+                <button onClick={() => setCancelOrder(null)} className="w-full py-2 rounded-xl bg-slate-900 text-white font-bold text-sm">
+                  Cerrar
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="text-xs text-slate-600 space-y-1">
+                  <div><strong>{cancelOrder.customerName}</strong> · Total ${cancelOrder.total.toLocaleString('es-AR')}</div>
+                  <div>Esto devuelve al stock lo entregado y descuenta los puntos de fidelización que generó.</div>
+                  {cancelOrder.cae && (
+                    <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                      Tiene factura electrónica ({cancelOrder.invoiceNumber}). Se va a emitir una <strong>nota de crédito en ARCA</strong> por el total. Si ARCA la rechaza, la venta no se anula.
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo:</label>
+                  <input
+                    type="text"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="ej: error de carga, el cliente devolvió la mercadería"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm"
+                  />
+                </div>
+
+                {cancelGoesToAccount(cancelOrder) ? (
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                    La venta estaba cargada en la cuenta corriente: se descuentan ${cancelOrder.total.toLocaleString('es-AR')} de la deuda del cliente.
+                  </div>
+                ) : cancelOrder.paymentStatus === 'pagado' ? (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-700 uppercase">¿Cómo se devuelve el dinero?</label>
+                    {([
+                      ['caja', 'Devolución en efectivo desde una caja'],
+                      ['cuenta', 'Dejar saldo a favor en la cuenta del cliente'],
+                      ['externo', 'Ya se devolvió por otro medio (transferencia, MP, etc.)']
+                    ] as const).map(([val, label]) => (
+                      <label key={val} className="flex items-center gap-2 text-xs text-slate-700">
+                        <input type="radio" checked={cancelRefund === val} onChange={() => setCancelRefund(val)} />
+                        {label}
+                      </label>
+                    ))}
+                    {cancelRefund === 'caja' && (
+                      <select
+                        value={cancelCashboxId}
+                        onChange={(e) => setCancelCashboxId(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm"
+                      >
+                        <option value="">Elegir caja...</option>
+                        {cashboxes.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ) : null}
+
+                {cancelError && (
+                  <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">{cancelError}</div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button onClick={() => setCancelOrder(null)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold">
+                    Volver
+                  </button>
+                  <button
+                    onClick={handleConfirmCancel}
+                    disabled={cancelBusy}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold"
+                  >
+                    {cancelBusy ? 'Anulando...' : 'Confirmar anulación'}
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

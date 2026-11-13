@@ -303,7 +303,7 @@ export const fePointsOfSale = async (ta: AccessTicket) => {
 
 export interface InvoiceRequest {
   ptoVta: number;
-  cbteTipo: number; // 1 = A, 6 = B, 11 = C
+  cbteTipo: number; // 1 = A, 6 = B, 11 = C · Notas de crédito: 3 = A, 8 = B, 13 = C
   docTipo: number; // 80 CUIT, 86 CUIL, 96 DNI, 99 consumidor final sin identificar
   docNro: string;
   condicionIvaReceptorId: number; // 1 RI, 4 Exento, 5 Consumidor final, 6 Monotributo
@@ -312,6 +312,8 @@ export interface InvoiceRequest {
   impIva: number;
   iva: { id: number; baseImp: number; importe: number }[];
   date?: string; // yyyymmdd
+  // Comprobante asociado: obligatorio en notas de crédito (la factura que se anula)
+  cbtesAsoc?: { tipo: number; ptoVta: number; nro: number; cuit?: string; fecha?: string }[];
 }
 
 const money = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
@@ -326,12 +328,17 @@ export const feAuthorizeInvoice = async (ta: AccessTicket, r: InvoiceRequest) =>
   const next = last.number + 1;
   const date = r.date || todayArgentina();
   const ivaXml =
-    r.cbteTipo === 11 || r.iva.length === 0
+    r.cbteTipo === 11 || r.cbteTipo === 13 || r.iva.length === 0
       ? ''
       : `<ar:Iva>${r.iva
           .map(a => `<ar:AlicIva><ar:Id>${a.id}</ar:Id><ar:BaseImp>${money(a.baseImp)}</ar:BaseImp><ar:Importe>${money(a.importe)}</ar:Importe></ar:AlicIva>`)
           .join('')}</ar:Iva>`;
-  const det = `<ar:FECAEDetRequest><ar:Concepto>1</ar:Concepto><ar:DocTipo>${r.docTipo}</ar:DocTipo><ar:DocNro>${cleanCuit(r.docNro) || '0'}</ar:DocNro><ar:CbteDesde>${next}</ar:CbteDesde><ar:CbteHasta>${next}</ar:CbteHasta><ar:CbteFch>${date}</ar:CbteFch><ar:ImpTotal>${money(r.impTotal)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${money(r.impNeto)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${money(r.impIva)}</ar:ImpIVA><ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${r.condicionIvaReceptorId}</ar:CondicionIVAReceptorId>${ivaXml}</ar:FECAEDetRequest>`;
+  const asocXml = (r.cbtesAsoc || []).length
+    ? `<ar:CbtesAsoc>${(r.cbtesAsoc || [])
+        .map(a => `<ar:CbteAsoc><ar:Tipo>${a.tipo}</ar:Tipo><ar:PtoVta>${a.ptoVta}</ar:PtoVta><ar:Nro>${a.nro}</ar:Nro>${a.cuit ? `<ar:Cuit>${cleanCuit(a.cuit)}</ar:Cuit>` : ''}${a.fecha ? `<ar:CbteFch>${a.fecha.replace(/-/g, '')}</ar:CbteFch>` : ''}</ar:CbteAsoc>`)
+        .join('')}</ar:CbtesAsoc>`
+    : '';
+  const det = `<ar:FECAEDetRequest><ar:Concepto>1</ar:Concepto><ar:DocTipo>${r.docTipo}</ar:DocTipo><ar:DocNro>${cleanCuit(r.docNro) || '0'}</ar:DocNro><ar:CbteDesde>${next}</ar:CbteDesde><ar:CbteHasta>${next}</ar:CbteHasta><ar:CbteFch>${date}</ar:CbteFch><ar:ImpTotal>${money(r.impTotal)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${money(r.impNeto)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${money(r.impIva)}</ar:ImpIVA><ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${r.condicionIvaReceptorId}</ar:CondicionIVAReceptorId>${asocXml}${ivaXml}</ar:FECAEDetRequest>`;
   const inner = `${authXml(ta)}<ar:FeCAEReq><ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${r.ptoVta}</ar:PtoVta><ar:CbteTipo>${r.cbteTipo}</ar:CbteTipo></ar:FeCabReq><ar:FeDetReq>${det}</ar:FeDetReq></ar:FeCAEReq>`;
   const xml = await wsfeCall(ta.env, 'FECAESolicitar', inner);
   const detResp = tag(xml, 'FECAEDetResponse') || '';
@@ -340,7 +347,7 @@ export const feAuthorizeInvoice = async (ta: AccessTicket, r: InvoiceRequest) =>
   const errors = collectErrors(xml);
   const cae = tag(detResp, 'CAE');
   if (result !== 'A' || !cae) {
-    throw new ArcaError('rejected', `ARCA rechazó la factura. ${[...errors, ...observations].join(' | ') || 'Sin detalle.'}`);
+    throw new ArcaError('rejected', `ARCA rechazó el comprobante. ${[...errors, ...observations].join(' | ') || 'Sin detalle.'}`);
   }
   const vto = tag(detResp, 'CAEFchVto') || '';
   return {

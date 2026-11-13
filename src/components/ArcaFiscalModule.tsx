@@ -255,7 +255,7 @@ export const ArcaFiscalModule: React.FC<ArcaFiscalModuleProps> = ({
                     <td className="px-4 py-3">
                       <div className="font-mono font-bold text-white flex items-center gap-1.5">
                         <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px]">
-                          {v.voucherType.replace('FACTURA_', 'FAC ')}
+                          {v.voucherType.replace('FACTURA_', 'FAC ').replace('NOTA_CREDITO_', 'NC ')}
                         </span>
                         {v.voucherNumber}
                       </div>
@@ -461,23 +461,23 @@ export const ArcaFiscalModule: React.FC<ArcaFiscalModuleProps> = ({
             <div className="border-2 border-slate-800 p-6 rounded-xl space-y-4">
               <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4">
                 <div>
-                  <h2 className="text-2xl font-black uppercase text-slate-900">{config?.companyName || 'COLOREAR PINTURAS S.A.'}</h2>
-                  <p className="text-xs text-slate-600">{config?.fiscalAddress || 'Planta Industrial Km 38.5'}</p>
-                  <p className="text-xs text-slate-600 font-mono">IVA Responsable Inscripto</p>
+                  <h2 className="text-2xl font-black uppercase text-slate-900">{config?.companyName || config?.tradeName || ''}</h2>
+                  <p className="text-xs text-slate-600">{config?.fiscalAddress || ''}</p>
+                  <p className="text-xs text-slate-600 font-mono">{({ responsable_inscripto: 'IVA Responsable Inscripto', monotributo: 'Responsable Monotributo', exento: 'IVA Exento' } as Record<string, string>)[config?.arcaTaxCondition || 'responsable_inscripto']}</p>
                 </div>
 
                 <div className="text-center px-4 py-2 border-2 border-slate-800 rounded-lg">
                   <span className="text-3xl font-black block">
-                    {selectedVoucher.voucherType === 'FACTURA_A' ? 'A' : 'B'}
+                    {selectedVoucher.voucherType.slice(-1)}
                   </span>
                   <span className="text-[10px] uppercase font-bold text-slate-500">
-                    COD. {selectedVoucher.voucherType === 'FACTURA_A' ? '01' : '06'}
+                    COD. {({ FACTURA_A: '01', FACTURA_B: '06', FACTURA_C: '11', NOTA_CREDITO_A: '03', NOTA_CREDITO_B: '08', NOTA_CREDITO_C: '13' } as Record<string, string>)[selectedVoucher.voucherType] || '--'}
                   </span>
                 </div>
 
                 <div className="text-right">
                   <div className="text-lg font-bold font-mono">
-                    {selectedVoucher.voucherType.replace('_', ' ')}
+                    {selectedVoucher.voucherType.replace(/_/g, ' ')}
                   </div>
                   <div className="text-sm font-mono font-bold text-slate-800">
                     N° {selectedVoucher.voucherNumber}
