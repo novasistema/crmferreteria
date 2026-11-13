@@ -1301,6 +1301,7 @@ export interface PurchaseInvoice {
   otherTaxes: number;
   iibbPerception: number;
   ivaPerception: number;
+  ivaAmount?: number; // IVA discriminado (solo A, M y notas); en B, C y X va incluido en el precio
   total: number;
   notes?: string;
   createdAt: string;

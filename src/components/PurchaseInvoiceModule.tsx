@@ -41,6 +41,8 @@ import {
   isIsoDate
 } from '../services/invoiceAI';
 
+const DISCRIMINATED_IVA_TYPES: PurchaseInvoiceType[] = ['Factura A', 'Factura M', 'Nota de Débito', 'Nota de Crédito'];
+
 interface PurchaseInvoiceModuleProps {
   products: Product[];
   suppliers: Supplier[];
@@ -412,21 +414,28 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
     return items.reduce((sum, it) => sum + (it.subtotal || 0), 0);
   }, [items]);
 
+  // Factor de los descuentos generales (se aplican en cadena sobre el neto)
+  const discountFactor = (1 - (Number(globalDiscountPercent) || 0) / 100) * (1 - (Number(extraDiscountPercent) || 0) / 100);
+
+  // IVA discriminado: solo en comprobantes A y M (y sus notas). En B, C y X el precio cargado ya es el final.
+  // Mismo criterio que el Libro IVA Compras (services/taxEngine.ts → buildPurchaseBook).
+  const discriminatesIva = DISCRIMINATED_IVA_TYPES.includes(invoiceType);
+
+  const ivaAmount = useMemo(() => {
+    if (!discriminatesIva) return 0;
+    return items.reduce((sum, it) => sum + (it.subtotal || 0) * discountFactor * (Number(it.ivaRate ?? 21) / 100), 0);
+  }, [items, discriminatesIva, discountFactor]);
+
   const totalCalculated = useMemo(() => {
-    let tot = itemsSubtotal;
-    if (globalDiscountPercent > 0) {
-      tot -= (tot * globalDiscountPercent) / 100;
-    }
-    if (extraDiscountPercent > 0) {
-      tot -= (tot * extraDiscountPercent) / 100;
-    }
+    let tot = itemsSubtotal * discountFactor;
+    tot += ivaAmount;
     // Add taxes and perceptions
     tot += Number(internalTax) || 0;
     tot += Number(otherTaxes) || 0;
     tot += Number(iibbPerception) || 0;
     tot += Number(ivaPerception) || 0;
     return Math.max(0, tot);
-  }, [itemsSubtotal, globalDiscountPercent, extraDiscountPercent, internalTax, otherTaxes, iibbPerception, ivaPerception]);
+  }, [itemsSubtotal, discountFactor, ivaAmount, internalTax, otherTaxes, iibbPerception, ivaPerception]);
 
   // Save Purchase Invoice
   const handleSavePurchase = async () => {
@@ -464,7 +473,8 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
         otherTaxes: Number(otherTaxes) || 0,
         iibbPerception: Number(iibbPerception) || 0,
         ivaPerception: Number(ivaPerception) || 0,
-        total: totalCalculated,
+        ivaAmount: Math.round(ivaAmount * 100) / 100,
+        total: Math.round(totalCalculated * 100) / 100,
         notes: notes.trim() || undefined,
         createdAt: new Date().toISOString()
       };
@@ -1314,6 +1324,15 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   onChange={(e) => setExtraDiscountPercent(Number(e.target.value) || 0)}
                   className="w-16 py-1.5 px-2 text-center rounded-lg border border-slate-300 text-xs font-bold bg-white"
                 />
+              </div>
+
+              <div className="flex items-center gap-2" title={discriminatesIva ? 'IVA discriminado de los renglones' : 'En comprobantes B, C y X el precio cargado ya incluye el IVA'}>
+                <span className="font-bold text-slate-500">IVA:</span>
+                <span className="font-mono font-black text-slate-900 text-sm">
+                  {discriminatesIva
+                    ? `$${ivaAmount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : 'incluido'}
+                </span>
               </div>
 
               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">

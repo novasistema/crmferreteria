@@ -13,8 +13,9 @@ Reglas:
 - "tipo": la letra del comprobante (A, B, C, M, X) o "R" si es remito. Si no figura, "X".
 - "puntoVenta" y "numero": solo dígitos, sin ceros de relleno obligatorios.
 - Fechas en formato AAAA-MM-DD. Si no figura el vencimiento, dejalo vacío.
-- En cada renglón, "precioUnitario" es el precio unitario NETO SIN IVA y antes de bonificaciones.
-  Si la factura muestra precios con IVA incluido (típico de factura B o C), dividilo por (1 + alícuota/100).
+- En cada renglón, "precioUnitario" es el precio unitario antes de bonificaciones:
+  en facturas A y M, el precio NETO SIN IVA (si el renglón lo muestra con IVA, dividilo por 1 + alícuota/100);
+  en facturas B, C, X y remitos, el precio tal como figura, con el IVA incluido si lo tiene.
 - "bonificacion1/2/3": porcentajes de descuento del renglón, en el orden en que aparecen (0 si no hay).
 - "alicuotaIva": 21, 10.5, 27 o 0. Si no se ve, usá 21.
 - "codigo": el código de artículo del proveedor tal cual figura (vacío si no hay).
