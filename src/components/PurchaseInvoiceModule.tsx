@@ -17,7 +17,11 @@ import {
   Download, 
   Edit3, 
   ArrowRightLeft,
-  ArrowUpDown
+  ArrowUpDown,
+  Sparkles,
+  Camera,
+  Loader2,
+  Link2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -28,6 +32,14 @@ import {
   PurchaseInvoiceType 
 } from '../types';
 import { ProductFormModal } from './ProductFormModal';
+import {
+  readInvoiceWithAI,
+  matchProduct,
+  matchSupplier,
+  suggestProducts,
+  toInvoiceType,
+  isIsoDate
+} from '../services/invoiceAI';
 
 interface PurchaseInvoiceModuleProps {
   products: Product[];
@@ -122,6 +134,14 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
 
   // Search filter for history tab
   const [historySearch, setHistorySearch] = useState('');
+
+  // Lectura de factura con IA
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState<{ read: number; linked: number; total?: number; supplierFound: boolean } | null>(null);
+  // Renglones leídos por la IA que no se vincularon a un producto: id del renglón → descripción leída
+  const [aiUnlinked, setAiUnlinked] = useState<Record<string, string>>({});
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -263,7 +283,109 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
 
   // Remove Item from Table
   const handleRemoveItem = (index: number) => {
+    const removed = items[index];
     setItems(items.filter((_, i) => i !== index));
+    if (removed && aiUnlinked[removed.id]) {
+      const next = { ...aiUnlinked };
+      delete next[removed.id];
+      setAiUnlinked(next);
+    }
+  };
+
+  // Lee la foto o PDF de la factura con IA y completa el formulario
+  const handleAiFile = async (file: File) => {
+    const hasRealItems = items.some(it => it.id !== 'item-demo-1');
+    if (hasRealItems && !window.confirm('La factura leída va a reemplazar los productos que ya cargaste. ¿Continuar?')) {
+      return;
+    }
+    setAiLoading(true);
+    setAiError(null);
+    setAiSummary(null);
+    try {
+      const inv = await readInvoiceWithAI(file);
+
+      const sup = matchSupplier(inv, suppliers);
+      if (sup) {
+        setSelectedSupplier(sup);
+        setSupplierSearch(sup.businessName);
+      } else if (inv.proveedorRazonSocial) {
+        setSelectedSupplier(null);
+        setSupplierSearch(inv.proveedorRazonSocial);
+      }
+
+      setInvoiceType(toInvoiceType(inv.tipo));
+      const pv = String(Number((inv.puntoVenta || '').replace(/\D/g, '')) || '');
+      const nro = String(Number((inv.numero || '').replace(/\D/g, '')) || '');
+      if (pv) setPosNumber(pv);
+      if (nro) setInvoiceNumber(nro);
+      if (isIsoDate(inv.fecha)) setInvoiceDate(inv.fecha!);
+      setDueDate(isIsoDate(inv.vencimiento) ? inv.vencimiento! : '');
+      setIibbPerception(Number(inv.percepcionIibb) || 0);
+      setIvaPerception(Number(inv.percepcionIva) || 0);
+      setInternalTax(Number(inv.impuestosInternos) || 0);
+      setOtherTaxes(Number(inv.otrosImpuestos) || 0);
+      setGlobalDiscountPercent(0);
+      setExtraDiscountPercent(0);
+
+      const stamp = Date.now();
+      const unlinked: Record<string, string> = {};
+      const newItems: PurchaseInvoiceItem[] = inv.items.map((it, i) => {
+        const prod = matchProduct(it, products);
+        const qty = Number(it.cantidad) || 1;
+        const price = Number(it.precioUnitario) || 0;
+        const d1 = Number(it.bonificacion1) || 0;
+        const d2 = Number(it.bonificacion2) || 0;
+        const d3 = Number(it.bonificacion3) || 0;
+        let net = price;
+        if (d1 > 0) net -= (net * d1) / 100;
+        if (d2 > 0) net -= (net * d2) / 100;
+        if (d3 > 0) net -= (net * d3) / 100;
+        const id = `item-ia-${stamp}-${i}`;
+        if (!prod) unlinked[id] = it.descripcion;
+        return {
+          id,
+          productId: prod?.id || `prod-custom-${stamp}-${i}`,
+          code: prod?.code || it.codigo || 'S/C',
+          name: prod?.name || it.descripcion,
+          quantity: qty,
+          unitPrice: price,
+          discount1: d1,
+          discount2: d2,
+          discount3: d3,
+          ivaRate: it.alicuotaIva ?? prod?.ivaRate ?? 21,
+          subtotal: net * qty,
+          profitMarginPercent: prod?.profitMarginPercent || 0,
+          unitCostCalculated: net,
+          primaryUnit: prod?.primaryUnit || 'Unidad'
+        };
+      });
+      setItems(newItems);
+      setAiUnlinked(unlinked);
+      setAiSummary({
+        read: newItems.length,
+        linked: newItems.length - Object.keys(unlinked).length,
+        total: Number(inv.total) || undefined,
+        supplierFound: !!sup
+      });
+    } catch (err: any) {
+      setAiError(err?.message || 'No se pudo leer la factura.');
+    } finally {
+      setAiLoading(false);
+      if (aiFileInputRef.current) aiFileInputRef.current.value = '';
+    }
+  };
+
+  // Vincula un renglón leído por la IA con un producto del sistema
+  const handleLinkAiItem = (itemId: string, productId: string) => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+    setItems(prev => prev.map(it => it.id === itemId
+      ? { ...it, productId: prod.id, code: prod.code, name: prod.name, profitMarginPercent: prod.profitMarginPercent || 0, primaryUnit: prod.primaryUnit || 'Unidad' }
+      : it));
+    const next = { ...aiUnlinked };
+    delete next[itemId];
+    setAiUnlinked(next);
+    setAiSummary(prev => prev ? { ...prev, linked: prev.linked + 1 } : prev);
   };
 
   // Update Item in Table
@@ -353,6 +475,8 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
       
       // Reset form to clean state
       setItems([]);
+      setAiUnlinked({});
+      setAiSummary(null);
       setPosNumber('1');
       setInvoiceNumber(String(Number(invoiceNumber) + 1));
       setNotes('');
@@ -452,6 +576,99 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                     ${(selectedSupplier.currentBalance || -398335).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </span>
                   <ExternalLink className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-pointer ml-1" />
+                </div>
+              )}
+            </div>
+
+            {/* LECTURA CON IA */}
+            <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-slate-900">Cargar factura con IA</div>
+                    <div className="text-xs text-slate-600">
+                      Sacale una foto o subí el PDF: se completan proveedor, número, fecha, productos, precios y percepciones.
+                    </div>
+                  </div>
+                </div>
+                <input
+                  ref={aiFileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) handleAiFile(f);
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={aiLoading}
+                  onClick={() => aiFileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold text-xs rounded-xl transition-colors shrink-0"
+                >
+                  {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                  <span>{aiLoading ? 'Leyendo factura…' : 'Foto o PDF de la factura'}</span>
+                </button>
+              </div>
+
+              {aiError && (
+                <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{aiError}</span>
+                </div>
+              )}
+
+              {aiSummary && (
+                <div className="text-xs text-slate-700 bg-white/70 border border-slate-200 rounded-xl px-3 py-2 space-y-1">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Se leyeron {aiSummary.read} renglones: {aiSummary.linked} vinculados a tus productos
+                    {aiSummary.read - aiSummary.linked > 0 ? `, ${aiSummary.read - aiSummary.linked} sin vincular` : ''}.
+                  </div>
+                  {!aiSummary.supplierFound && (
+                    <div>El proveedor no está cargado en el sistema: revisalo o elegilo de la lista antes de guardar.</div>
+                  )}
+                  {aiSummary.total !== undefined && (
+                    <div>
+                      Total impreso en el comprobante: <span className="font-mono font-bold">${aiSummary.total.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>. Controlalo antes de guardar.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {Object.keys(aiUnlinked).length > 0 && (
+                <div className="bg-white border border-amber-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
+                    <Link2 className="w-4 h-4" />
+                    Renglones sin vincular: elegí a qué producto corresponde cada uno para que sume stock.
+                  </div>
+                  {items.filter(it => aiUnlinked[it.id]).map(it => {
+                    const options = suggestProducts(aiUnlinked[it.id], products);
+                    return (
+                      <div key={it.id} className="grid grid-cols-1 md:grid-cols-2 gap-2 items-center">
+                        <div className="text-xs text-slate-700 truncate" title={aiUnlinked[it.id]}>
+                          <span className="font-mono text-slate-400 mr-1">{it.code}</span>{aiUnlinked[it.id]}
+                        </div>
+                        <select
+                          defaultValue=""
+                          onChange={e => e.target.value && handleLinkAiItem(it.id, e.target.value)}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white"
+                        >
+                          <option value="">{options.length ? 'Elegir producto…' : 'Sin parecidos: crealo con F2'}</option>
+                          {options.map(p => (
+                            <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                  <div className="text-[11px] text-slate-500">
+                    Si es un producto nuevo, crealo con F2 y después elegilo acá. Los renglones sin vincular se guardan en la factura pero no suman stock.
+                  </div>
                 </div>
               )}
             </div>
