@@ -135,6 +135,14 @@ import { ActualizacionPreciosModule } from './components/products/ActualizacionP
 import { TransferenciasModule } from './components/products/TransferenciasModule';
 import { PedidosSucursalModule } from './components/products/PedidosSucursalModule';
 
+// Fecha local (Argentina) en formato AAAA-MM-DD: toISOString() usa UTC y después de las 21 hs marca el día siguiente
+const loyaltyToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+// IDs únicos aunque se generen dos en el mismo milisegundo
+const loyaltyId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
 export default function App() {
   const [activeModule, setActiveModule] = useState<ModuleKey>('desktop');
   const [openTabs, setOpenTabs] = useState<TabItem[]>([
@@ -889,6 +897,10 @@ export default function App() {
         ...additionalData
       });
 
+      if (status === 'cancelado' && order.status !== 'cancelado') {
+        await reverseLoyaltyForOrder(orderId);
+      }
+
       // Automatic notifications based on stage
       if (status === 'preparando_remito' || status === 'facturado') {
         const notifId = `notif-${Date.now()}`;
@@ -1289,7 +1301,9 @@ export default function App() {
     // - pointsPerCurrency = 0.01 (1 punto cada $100)
     // - Los clientes con hasCurrentAccount === true quedan SIEMPRE EXCLUIDOS
     // - referenceType: "sale" y referenceId
-    if (cust && !cust.hasCurrentAccount && cust.loyaltyEligible !== false) {
+    // Solo suman puntos las ventas cobradas en el acto: nada de fiado, cuenta corriente ni "no_pago"
+    const isPaidNow = order.paymentStatus === 'pagado' && paymentMethod !== 'no_pago' && paymentMethod !== 'cuenta_corriente';
+    if (cust && isPaidNow && !cust.hasCurrentAccount && cust.loyaltyEligible !== false) {
       const pointsEarned = Math.floor(order.total * 0.01);
       if (pointsEarned > 0) {
         batch.update(doc(db, 'customers', cust.id), {
@@ -1306,7 +1320,7 @@ export default function App() {
           referenceType: 'sale',
           referenceId: order.id,
           description: `Puntos por compra contado en Pedido ${order.orderNumber} ($${order.total.toLocaleString('es-AR')})`,
-          date: new Date().toISOString().split('T')[0]
+          date: loyaltyToday()
         });
       }
     }
@@ -1569,6 +1583,8 @@ export default function App() {
   };
 
   // --- LOYALTY (FIDELIZACIÓN) HANDLERS ---
+  // Los saldos se mueven con increment() para que dos operaciones seguidas (doble clic, dos cajas,
+  // modo offline) no se pisen entre sí usando un saldo viejo de la pantalla.
   const handleSaveLoyaltyReward = async (reward: LoyaltyReward) => {
     try {
       await setDoc(doc(db, 'loyalty_rewards', reward.id), reward);
@@ -1577,31 +1593,66 @@ export default function App() {
     }
   };
 
-  const handleAdjustPoints = async (customerId: string, points: number, concept: string) => {
-    try {
-      const cust = customers.find(c => c.id === customerId);
-      if (!cust) return;
-      if (cust.hasCurrentAccount) {
-        alert("Cliente excluido de fidelización por tener Cuenta Corriente.");
-        return;
-      }
-      const batch = writeBatch(db);
-      const currentPts = cust.loyaltyPoints || 0;
-      const newPts = Math.max(0, currentPts + points);
-      const custRef = doc(db, 'customers', customerId);
-      batch.update(custRef, { loyaltyPoints: newPts });
+  const isLoyaltyExcluded = (c: Customer) => Boolean(c.hasCurrentAccount) || c.loyaltyEligible === false;
 
-      const txId = `ltx-${Date.now()}`;
+  // Acredita los puntos de un pedido que se cobró después (ej. pedido mayorista pendiente que se paga)
+  const creditLoyaltyForPaidOrder = async (orderId: string, amount: number) => {
+    const order = salesOrders.find(o => o.id === orderId);
+    if (!order) return;
+    const cust = customers.find(c => c.id === order.customerId);
+    if (!cust || isLoyaltyExcluded(cust)) return;
+    const txId = `ltx-sale-${order.id}`;
+    if (loyaltyTransactions.some(t => t.id === txId)) return; // ya acreditado
+    const pointsEarned = Math.floor((Number(amount) || order.total) * 0.01);
+    if (pointsEarned <= 0) return;
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'customers', cust.id), {
+      loyaltyPoints: increment(pointsEarned),
+      loyaltyTotalEarned: increment(pointsEarned)
+    });
+    batch.set(doc(db, 'loyalty_transactions', txId), {
+      id: txId,
+      customerId: cust.id,
+      type: 'acumulacion_compra',
+      points: pointsEarned,
+      referenceType: 'sale',
+      referenceId: order.id,
+      description: `Puntos por pago del Pedido ${order.orderNumber} ($${(Number(amount) || order.total).toLocaleString('es-AR')})`,
+      date: loyaltyToday()
+    });
+    await batch.commit();
+  };
+
+  const handleAdjustPoints = async (customerId: string, points: number, concept: string) => {
+    const cust = customers.find(c => c.id === customerId);
+    if (!cust) return;
+    if (isLoyaltyExcluded(cust)) {
+      alert("Cliente excluido del programa de fidelización.");
+      return;
+    }
+    const currentPts = cust.loyaltyPoints || 0;
+    // Nunca dejar el saldo en negativo: el movimiento registra lo que realmente se aplicó
+    const applied = points < 0 ? -Math.min(currentPts, Math.abs(points)) : points;
+    if (applied === 0) {
+      alert("El cliente no tiene puntos para descontar.");
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'customers', customerId), {
+        loyaltyPoints: increment(applied),
+        ...(applied > 0 ? { loyaltyTotalEarned: increment(applied) } : {})
+      });
+      const txId = loyaltyId('ltx');
       batch.set(doc(db, 'loyalty_transactions', txId), {
         id: txId,
         customerId,
         type: 'ajuste_manual',
-        points,
+        points: applied,
         referenceType: 'manual',
         description: concept,
-        date: new Date().toISOString().split('T')[0]
+        date: loyaltyToday()
       });
-
       await batch.commit();
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'loyalty_transactions');
@@ -1609,29 +1660,22 @@ export default function App() {
   };
 
   const handleRedeemLoyaltyReward = async (customerId: string, rewardId: string): Promise<string | null> => {
+    const cust = customers.find(c => c.id === customerId);
+    const rew = loyaltyRewards.find(r => r.id === rewardId);
+    if (!cust || !rew) return null;
+    if (isLoyaltyExcluded(cust) || rew.active === false) return null;
+    if ((cust.loyaltyPoints || 0) < rew.pointsCost || rew.stock <= 0) return null;
+
     try {
-      const cust = customers.find(c => c.id === customerId);
-      const rew = loyaltyRewards.find(r => r.id === rewardId);
-      if (!cust || !rew) return null;
-      if (cust.hasCurrentAccount) return null;
-      if ((cust.loyaltyPoints || 0) < rew.pointsCost || rew.stock <= 0) return null;
-
       const batch = writeBatch(db);
-      const redemptionCode = `CJ-${Math.floor(Math.random() * 899999 + 100000)}`;
-      const redId = `red-${Date.now()}`;
+      const redemptionCode = `CJ-${Math.floor(Math.random() * 899999 + 100000)}${Math.random().toString(36).slice(2, 4).toUpperCase()}`;
+      const redId = loyaltyId('red');
 
-      // Deduct points
-      const custRef = doc(db, 'customers', customerId);
-      batch.update(custRef, {
-        loyaltyPoints: (cust.loyaltyPoints || 0) - rew.pointsCost,
-        loyaltyTotalRedeemed: (cust.loyaltyTotalRedeemed || 0) + rew.pointsCost
+      batch.update(doc(db, 'customers', customerId), {
+        loyaltyPoints: increment(-rew.pointsCost),
+        loyaltyTotalRedeemed: increment(rew.pointsCost)
       });
-
-      // Deduct reward stock
-      const rewRef = doc(db, 'loyalty_rewards', rewardId);
-      batch.update(rewRef, { stock: increment(-1) });
-
-      // Save redemption coupon
+      batch.update(doc(db, 'loyalty_rewards', rewardId), { stock: increment(-1) });
       batch.set(doc(db, 'loyalty_redemptions', redId), {
         id: redId,
         code: redemptionCode,
@@ -1641,12 +1685,10 @@ export default function App() {
         rewardId,
         rewardTitle: rew.title,
         pointsCost: rew.pointsCost,
-        date: new Date().toISOString().split('T')[0],
+        date: loyaltyToday(),
         status: 'emitido'
       });
-
-      // Log transaction
-      const txId = `ltx-${Date.now()}`;
+      const txId = loyaltyId('ltx');
       batch.set(doc(db, 'loyalty_transactions', txId), {
         id: txId,
         customerId,
@@ -1655,9 +1697,8 @@ export default function App() {
         referenceType: 'redemption',
         referenceId: redId,
         description: `Canje de premio: ${rew.title} (Cupón ${redemptionCode})`,
-        date: new Date().toISOString().split('T')[0]
+        date: loyaltyToday()
       });
-
       await batch.commit();
       return redemptionCode;
     } catch (e) {
@@ -1668,7 +1709,7 @@ export default function App() {
 
   const handleValidateCoupon = async (couponCode: string): Promise<boolean> => {
     try {
-      const red = loyaltyRedemptions.find(r => r.code === couponCode && r.status === 'emitido');
+      const red = loyaltyRedemptions.find(r => r.code?.toUpperCase() === couponCode.toUpperCase() && r.status === 'emitido');
       if (!red) return false;
       await updateDoc(doc(db, 'loyalty_redemptions', red.id), {
         status: 'entregado',
@@ -1682,59 +1723,122 @@ export default function App() {
     }
   };
 
-  const handleEnterRaffle = async (customerId: string, raffleId: string) => {
+  const handleEnterRaffle = async (customerId: string, raffleId: string, entries: number = 1) => {
+    const cust = customers.find(c => c.id === customerId);
+    const raf = loyaltyRaffles.find(r => r.id === raffleId);
+    const qty = Math.max(1, Math.floor(Number(entries) || 1));
+    if (!cust || !raf) throw new Error('Cliente o sorteo no encontrado.');
+    if (isLoyaltyExcluded(cust)) throw new Error('El cliente no participa del programa de puntos.');
+    if (raf.status !== 'activo') throw new Error('El sorteo ya está finalizado.');
+    const cost = raf.pointsPerEntry * qty;
+    if ((cust.loyaltyPoints || 0) < cost) throw new Error(`Puntos insuficientes: necesita ${cost} pts y tiene ${cust.loyaltyPoints || 0}.`);
+
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'customers', customerId), {
+      loyaltyPoints: increment(-cost),
+      loyaltyTotalRedeemed: increment(cost)
+    });
+    batch.update(doc(db, 'loyalty_raffles', raffleId), { totalEntries: increment(qty) });
+    const txId = loyaltyId('ltx');
+    batch.set(doc(db, 'loyalty_transactions', txId), {
+      id: txId,
+      customerId,
+      customerName: cust.businessName || cust.tradeName || 'Cliente',
+      type: 'sorteo_entrada',
+      points: -cost,
+      entries: qty,
+      referenceType: 'raffle',
+      referenceId: raffleId,
+      description: `${qty} ${qty === 1 ? 'chance' : 'chances'} para: ${raf.title}`,
+      date: loyaltyToday()
+    });
+    await batch.commit();
+  };
+
+  const handleCreateRaffle = async (raffle: LoyaltyRaffle) => {
     try {
-      const cust = customers.find(c => c.id === customerId);
-      const raf = loyaltyRaffles.find(r => r.id === raffleId);
-      if (!cust || !raf) return;
-      if (cust.hasCurrentAccount) return;
-      if ((cust.loyaltyPoints || 0) < raf.pointsPerEntry) return;
-
-      const batch = writeBatch(db);
-      const custRef = doc(db, 'customers', customerId);
-      batch.update(custRef, {
-        loyaltyPoints: (cust.loyaltyPoints || 0) - raf.pointsPerEntry
-      });
-
-      const rafRef = doc(db, 'loyalty_raffles', raffleId);
-      batch.update(rafRef, {
-        totalEntries: (raf.totalEntries || 0) + 1
-      });
-
-      const txId = `ltx-${Date.now()}`;
-      batch.set(doc(db, 'loyalty_transactions', txId), {
-        id: txId,
-        customerId,
-        type: 'sorteo_entrada',
-        points: -raf.pointsPerEntry,
-        referenceType: 'raffle',
-        referenceId: raffleId,
-        description: `Entrada para: ${raf.title}`,
-        date: new Date().toISOString().split('T')[0]
-      });
-
-      await batch.commit();
+      await setDoc(doc(db, 'loyalty_raffles', raffle.id), raffle);
     } catch (e) {
-      console.error(e);
+      handleFirestoreError(e, OperationType.WRITE, 'loyalty_raffles');
     }
   };
 
+  // Sorteo ponderado: cada chance comprada es un "boleto"; más chances = más probabilidad de ganar
+  const handleDrawRaffle = async (raffleId: string): Promise<string> => {
+    const raf = loyaltyRaffles.find(r => r.id === raffleId);
+    if (!raf) throw new Error('Sorteo no encontrado.');
+    if (raf.status !== 'activo') throw new Error('Este sorteo ya fue realizado.');
+    const tickets: string[] = [];
+    loyaltyTransactions
+      .filter(t => t.type === 'sorteo_entrada' && t.referenceId === raffleId)
+      .forEach(t => {
+        const n = t.entries || Math.max(1, Math.round(Math.abs(t.points) / (raf.pointsPerEntry || 1)));
+        for (let i = 0; i < n; i++) tickets.push(t.customerId);
+      });
+    if (tickets.length === 0) throw new Error('No hay participantes anotados en este sorteo.');
+    const rnd = new Uint32Array(1);
+    crypto.getRandomValues(rnd);
+    const winnerId = tickets[rnd[0] % tickets.length];
+    const winner = customers.find(c => c.id === winnerId);
+    const winnerName = winner?.businessName || winner?.tradeName || 'Cliente';
+    await updateDoc(doc(db, 'loyalty_raffles', raffleId), {
+      status: 'finalizado',
+      winnerCustomerId: winnerId,
+      winnerCustomerName: winnerName,
+      drawnAt: new Date().toISOString(),
+      drawnBy: currentUser?.name || 'Administración',
+      totalTicketsAtDraw: tickets.length
+    });
+    return winnerName;
+  };
+
+  // Si una venta se cancela, se descuentan los puntos que había generado
+  const reverseLoyaltyForOrder = async (orderId: string) => {
+    const tx = loyaltyTransactions.find(t => t.id === `ltx-sale-${orderId}`);
+    if (!tx || tx.points <= 0) return;
+    if (loyaltyTransactions.some(t => t.id === `ltx-rev-${orderId}`)) return; // ya revertido
+    const cust = customers.find(c => c.id === tx.customerId);
+    if (!cust) return;
+    const toRemove = Math.min(tx.points, cust.loyaltyPoints || 0);
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'customers', cust.id), {
+      loyaltyPoints: increment(-toRemove),
+      loyaltyTotalEarned: increment(-tx.points)
+    });
+    batch.set(doc(db, 'loyalty_transactions', `ltx-rev-${orderId}`), {
+      id: `ltx-rev-${orderId}`,
+      customerId: cust.id,
+      type: 'ajuste_manual',
+      points: -toRemove,
+      referenceType: 'sale',
+      referenceId: orderId,
+      description: `Reversión de puntos por venta cancelada${toRemove < tx.points ? ` (ya había usado ${tx.points - toRemove} pts)` : ''}`,
+      date: loyaltyToday()
+    });
+    await batch.commit();
+  };
+
+  // Firestore acepta hasta 500 operaciones por lote: se parte en tandas para que el reset
+  // funcione con muchos clientes. Los errores se propagan para que la pantalla no muestre un éxito falso.
   const handleResetLoyaltyProgram = async () => {
-    try {
+    const ops: Array<(b: ReturnType<typeof writeBatch>) => void> = [];
+    customers.forEach(c => {
+      ops.push(b => b.update(doc(db, 'customers', c.id), {
+        loyaltyPoints: 0,
+        loyaltyTotalEarned: 0,
+        loyaltyTotalRedeemed: 0
+      }));
+    });
+    const activeRaffleIds = new Set(loyaltyRaffles.filter(r => r.status === 'activo').map(r => r.id));
+    loyaltyTransactions.forEach(t => {
+      // Se conservan las chances de sorteos todavía abiertos para poder sortearlos igual
+      if (t.type === 'sorteo_entrada' && t.referenceId && activeRaffleIds.has(t.referenceId)) return;
+      ops.push(b => b.delete(doc(db, 'loyalty_transactions', t.id)));
+    });
+    for (let i = 0; i < ops.length; i += 400) {
       const batch = writeBatch(db);
-      customers.forEach(c => {
-        batch.update(doc(db, 'customers', c.id), {
-          loyaltyPoints: 0,
-          loyaltyTotalEarned: 0,
-          loyaltyTotalRedeemed: 0
-        });
-      });
-      loyaltyTransactions.forEach(t => {
-        batch.delete(doc(db, 'loyalty_transactions', t.id));
-      });
+      ops.slice(i, i + 400).forEach(op => op(batch));
       await batch.commit();
-    } catch (e) {
-      console.error(e);
     }
   };
 
@@ -2084,6 +2188,8 @@ export default function App() {
             onLoginClient={handleLoginClient}
             onLogoutClient={handleLogoutClient}
             onRedeemReward={handleRedeemLoyaltyReward}
+            raffles={loyaltyRaffles}
+            onEnterRaffle={handleEnterRaffle}
           />
         </div>
       );
@@ -2254,6 +2360,7 @@ export default function App() {
                   paymentStatus: 'pagado',
                   paidAmount: amount
                 });
+                await creditLoyaltyForPaidOrder(orderId, amount);
               }}
               onSaveQuote={async (quote) => {
                 await setDoc(doc(db, 'quotes', quote.id), quote);
@@ -2900,6 +3007,8 @@ export default function App() {
               onLoginClient={handleLoginClient}
               onLogoutClient={handleLogoutClient}
               onRedeemReward={handleRedeemLoyaltyReward}
+              raffles={loyaltyRaffles}
+              onEnterRaffle={handleEnterRaffle}
             />
           )}
 
@@ -2928,6 +3037,8 @@ export default function App() {
               onRedeemReward={handleRedeemLoyaltyReward}
               onValidateCoupon={handleValidateCoupon}
               onEnterRaffle={handleEnterRaffle}
+              onCreateRaffle={handleCreateRaffle}
+              onDrawRaffle={handleDrawRaffle}
               onResetLoyaltyProgram={handleResetLoyaltyProgram}
             />
           )}

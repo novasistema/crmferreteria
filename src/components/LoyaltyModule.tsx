@@ -44,7 +44,9 @@ interface LoyaltyModuleProps {
   onAdjustPoints: (customerId: string, points: number, concept: string) => Promise<void>;
   onRedeemReward: (customerId: string, rewardId: string) => Promise<string | null>; // Returns redemption code
   onValidateCoupon: (couponCode: string) => Promise<boolean>;
-  onEnterRaffle: (customerId: string, raffleId: string) => Promise<void>;
+  onEnterRaffle: (customerId: string, raffleId: string, entries?: number) => Promise<void>;
+  onCreateRaffle: (raffle: LoyaltyRaffle) => Promise<void>;
+  onDrawRaffle: (raffleId: string) => Promise<string>; // Devuelve el nombre del ganador
   onResetLoyaltyProgram: () => Promise<void>;
 }
 
@@ -60,6 +62,8 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
   onRedeemReward,
   onValidateCoupon,
   onEnterRaffle,
+  onCreateRaffle,
+  onDrawRaffle,
   onResetLoyaltyProgram
 }) => {
   const [activeTab, setActiveTab] = useState<'rewards' | 'customers' | 'coupons' | 'raffles' | 'history'>('rewards');
@@ -94,6 +98,108 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
   const [adjustConcept, setAdjustConcept] = useState<string>('Bonificación por recomendación de cliente');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Canje en mostrador
+  const [redeemCustomer, setRedeemCustomer] = useState<Customer | null>(null);
+  const [redeemResult, setRedeemResult] = useState<{ code: string; title: string; delivered: boolean } | null>(null);
+
+  // Sorteos
+  const [showNewRaffleModal, setShowNewRaffleModal] = useState(false);
+  const [raffleForm, setRaffleForm] = useState({ title: '', prizeDescription: '', drawDate: '', pointsPerEntry: 50 });
+  const [enrollState, setEnrollState] = useState<Record<string, { customerId: string; entries: number }>>({});
+  const [raffleMsg, setRaffleMsg] = useState<{ raffleId: string; ok: boolean; msg: string } | null>(null);
+
+  const raffleParticipants = useMemo(() => {
+    const map: Record<string, { customerId: string; name: string; entries: number }[]> = {};
+    transactions
+      .filter(t => t.type === 'sorteo_entrada' && t.referenceId)
+      .forEach(t => {
+        const raf = raffles.find(r => r.id === t.referenceId);
+        const n = t.entries || Math.max(1, Math.round(Math.abs(t.points) / (raf?.pointsPerEntry || 1)));
+        const list = (map[t.referenceId!] = map[t.referenceId!] || []);
+        const found = list.find(p => p.customerId === t.customerId);
+        if (found) found.entries += n;
+        else {
+          const c = customers.find(x => x.id === t.customerId);
+          list.push({ customerId: t.customerId, name: c?.businessName || c?.tradeName || t.customerName || 'Cliente', entries: n });
+        }
+      });
+    Object.values(map).forEach(l => l.sort((a, b) => b.entries - a.entries));
+    return map;
+  }, [transactions, raffles, customers]);
+
+  const handleCounterRedeem = async (reward: LoyaltyReward) => {
+    if (!redeemCustomer) return;
+    if (!window.confirm(`¿Canjear "${reward.title}" por ${reward.pointsCost} pts a ${redeemCustomer.businessName || redeemCustomer.tradeName}?`)) return;
+    setIsSubmitting(true);
+    try {
+      const code = await onRedeemReward(redeemCustomer.id, reward.id);
+      if (!code) {
+        alert('No se pudo canjear: verificá los puntos del cliente y el stock del premio.');
+        return;
+      }
+      setRedeemResult({ code, title: reward.title, delivered: false });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateRaffleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!raffleForm.title.trim() || !raffleForm.drawDate || raffleForm.pointsPerEntry < 1) return;
+    setIsSubmitting(true);
+    try {
+      await onCreateRaffle({
+        id: `raf-${Date.now()}`,
+        title: raffleForm.title.trim(),
+        prizeDescription: raffleForm.prizeDescription.trim(),
+        drawDate: raffleForm.drawDate,
+        pointsPerEntry: Math.floor(raffleForm.pointsPerEntry),
+        status: 'activo',
+        totalEntries: 0,
+        createdAt: new Date().toISOString()
+      });
+      setShowNewRaffleModal(false);
+      setRaffleForm({ title: '', prizeDescription: '', drawDate: '', pointsPerEntry: 50 });
+    } catch (err) {
+      console.error(err);
+      alert('Error al crear el sorteo.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEnroll = async (raffle: LoyaltyRaffle) => {
+    const st = enrollState[raffle.id];
+    if (!st?.customerId) {
+      setRaffleMsg({ raffleId: raffle.id, ok: false, msg: 'Elegí un cliente.' });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onEnterRaffle(st.customerId, raffle.id, st.entries || 1);
+      const c = customers.find(x => x.id === st.customerId);
+      setRaffleMsg({ raffleId: raffle.id, ok: true, msg: `${c?.businessName || c?.tradeName} anotado con ${st.entries || 1} chance(s).` });
+      setEnrollState({ ...enrollState, [raffle.id]: { customerId: '', entries: 1 } });
+    } catch (err: any) {
+      setRaffleMsg({ raffleId: raffle.id, ok: false, msg: err?.message || 'No se pudo anotar.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDraw = async (raffle: LoyaltyRaffle) => {
+    if (!window.confirm(`¿Sortear ahora "${raffle.title}"? El resultado es definitivo y el sorteo queda cerrado.`)) return;
+    setIsSubmitting(true);
+    try {
+      const winner = await onDrawRaffle(raffle.id);
+      setRaffleMsg({ raffleId: raffle.id, ok: true, msg: `🎉 Ganador: ${winner}` });
+    } catch (err: any) {
+      setRaffleMsg({ raffleId: raffle.id, ok: false, msg: err?.message || 'No se pudo realizar el sorteo.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Customers classified by eligibility
   // REGLA MAESTRA EXACTA: hasCurrentAccount === true -> SIEMPRE EXCLUIDO de fidelización
   const eligibleCustomers = useMemo(() => {
@@ -124,7 +230,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
         pointsCost: Number(rewardForm.pointsCost) || 100,
         referencePriceArs: Number(rewardForm.referencePriceArs) || 0,
         imageUrl: rewardForm.imageUrl || '',
-        stock: Number(rewardForm.stock) || 1,
+        stock: Math.max(0, Number(rewardForm.stock) || 0),
         active: Boolean(rewardForm.active),
         termsAndConditions: rewardForm.termsAndConditions,
         createdAt: new Date().toISOString()
@@ -138,7 +244,8 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
         pointsCost: 100,
         referencePriceArs: 15000,
         stock: 10,
-        active: true
+        active: true,
+        termsAndConditions: 'Canje presencial en fábrica o agregado a pedido mayorista.'
       });
     } catch (err) {
       console.error(err);
@@ -154,8 +261,8 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
     if (!showAdjustModal) return;
 
     // Strict validation
-    if (showAdjustModal.hasCurrentAccount) {
-      alert("Operación denegada: Este cliente posee Cuenta Corriente activa y queda permanentemente excluido de la acumulación de puntos.");
+    if (showAdjustModal.hasCurrentAccount || showAdjustModal.loyaltyEligible === false) {
+      alert("Operación denegada: este cliente está excluido del programa de puntos (Cuenta Corriente o marcado como no participante).");
       return;
     }
 
@@ -214,7 +321,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
       alert("El programa de puntos ha sido reiniciado a cero con éxito.");
     } catch (err) {
       console.error(err);
-      alert("Error al ejecutar el reset.");
+      alert("Error al ejecutar el reset. Puede haber quedado a medias: revisá la conexión y volvé a ejecutarlo.");
     } finally {
       setIsSubmitting(false);
     }
@@ -426,6 +533,11 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
       {/* TAB: REWARDS CATALOG */}
       {activeTab === 'rewards' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rewards.length === 0 && (
+            <div className="col-span-full p-8 text-center text-slate-500 text-sm bg-slate-900 border border-slate-800 rounded-2xl">
+              Todavía no hay premios cargados. Usá "Nuevo Premio" para armar el catálogo.
+            </div>
+          )}
           {rewards.map(reward => (
             <div key={reward.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
               <div>
@@ -439,7 +551,10 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                   </div>
                 </div>
 
-                <h4 className="text-base font-bold text-white mb-1">{reward.title}</h4>
+                <h4 className="text-base font-bold text-white mb-1">
+                  {reward.title}
+                  {reward.active === false && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 align-middle">INACTIVO</span>}
+                </h4>
                 <p className="text-xs text-slate-400 mb-3">{reward.description}</p>
               </div>
 
@@ -450,8 +565,15 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                     {reward.stock} disponibles
                   </span>
                 </div>
-                <div className="font-mono text-slate-400">
-                  Ref: ${reward.referencePriceArs.toLocaleString('es-AR')}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-slate-400">Ref: ${(reward.referencePriceArs || 0).toLocaleString('es-AR')}</span>
+                  <button
+                    type="button"
+                    onClick={() => onSaveReward({ ...reward, active: reward.active === false })}
+                    className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold"
+                  >
+                    {reward.active === false ? 'Activar' : 'Pausar'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -488,10 +610,11 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {customers
-                .filter(c => 
-                  c.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  c.taxId?.toLowerCase().includes(searchTerm.toLowerCase())
-                )
+                .filter(c => {
+                  const q = searchTerm.trim().toLowerCase();
+                  if (!q) return true;
+                  return [c.businessName, c.tradeName, c.taxId].some(v => (v || '').toLowerCase().includes(q));
+                })
                 .map(customer => {
                   const isExcluded = customer.hasCurrentAccount || customer.loyaltyEligible === false;
 
@@ -540,12 +663,20 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
 
                       <td className="px-4 py-3 text-right">
                         {!isExcluded && (
-                          <button
-                            onClick={() => setShowAdjustModal(customer)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
-                          >
-                            Ajustar Puntos
-                          </button>
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              onClick={() => { setRedeemResult(null); setRedeemCustomer(customer); }}
+                              className="px-2.5 py-1 rounded-lg bg-purple-600/80 hover:bg-purple-500 text-white text-xs font-semibold"
+                            >
+                              Canjear
+                            </button>
+                            <button
+                              onClick={() => setShowAdjustModal(customer)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
+                            >
+                              Ajustar Puntos
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -578,7 +709,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                   </td>
                 </tr>
               ) : (
-                redemptions.map(red => (
+                [...redemptions].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(red => (
                   <tr key={red.id} className="hover:bg-slate-800/40">
                     <td className="px-4 py-3 font-mono font-bold text-emerald-400 text-sm">
                       {red.code}
@@ -593,7 +724,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
                       }`}>
-                        {red.status.toUpperCase()}
+                        {(red.status || '').toUpperCase()}
                       </span>
                     </td>
                   </tr>
@@ -606,31 +737,134 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
 
       {/* TAB: RAFFLES & SORTEOS */}
       {activeTab === 'raffles' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {raffles.map(raffle => (
-            <div key={raffle.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  {raffle.status === 'activo' ? 'SORTEO EN CURSO' : 'FINALIZADO'}
-                </span>
-                <span className="text-xs text-slate-400 font-mono">Fecha Sorteo: {raffle.drawDate}</span>
-              </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-400">
+              Cada chance cuesta puntos. Más chances = más probabilidad de ganar (sorteo ponderado).
+            </p>
+            <button
+              onClick={() => setShowNewRaffleModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo Sorteo
+            </button>
+          </div>
 
-              <h4 className="text-base font-bold text-white">{raffle.title}</h4>
-              <p className="text-xs text-slate-300">{raffle.prizeDescription}</p>
-
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-slate-400">Costo por Entrada: </span>
-                  <span className="font-bold text-purple-400 font-mono">{raffle.pointsPerEntry} pts</span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Total Participaciones: </span>
-                  <span className="font-bold text-white font-mono">{raffle.totalEntries}</span>
-                </div>
-              </div>
+          {raffles.length === 0 && (
+            <div className="p-8 text-center text-slate-500 text-sm bg-slate-900 border border-slate-800 rounded-2xl">
+              No hay sorteos creados todavía.
             </div>
-          ))}
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[...raffles].sort((x, y) => Number(x.status !== 'activo') - Number(y.status !== 'activo')).map(raffle => {
+              const participants = raffleParticipants[raffle.id] || [];
+              const tickets = participants.reduce((acc, p) => acc + p.entries, 0);
+              const st = enrollState[raffle.id] || { customerId: '', entries: 1 };
+              const isActive = raffle.status === 'activo';
+              return (
+                <div key={raffle.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                      isActive ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {isActive ? 'SORTEO EN CURSO' : 'FINALIZADO'}
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">Fecha Sorteo: {raffle.drawDate}</span>
+                  </div>
+
+                  <h4 className="text-base font-bold text-white">{raffle.title}</h4>
+                  <p className="text-xs text-slate-300">{raffle.prizeDescription}</p>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-slate-400">Costo por chance: </span>
+                      <span className="font-bold text-purple-400 font-mono">{raffle.pointsPerEntry} pts</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Chances: </span>
+                      <span className="font-bold text-white font-mono">{tickets || raffle.totalEntries || 0}</span>
+                      <span className="text-slate-500"> · {participants.length} participantes</span>
+                    </div>
+                  </div>
+
+                  {!isActive && raffle.winnerCustomerName && (
+                    <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800 text-emerald-300 text-sm font-bold flex items-center gap-2">
+                      <Award className="w-4 h-4" />
+                      Ganador: {raffle.winnerCustomerName}
+                      {raffle.drawnAt && <span className="text-[11px] font-normal text-emerald-400/70">({new Date(raffle.drawnAt).toLocaleString('es-AR')})</span>}
+                    </div>
+                  )}
+
+                  {participants.length > 0 && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-slate-400 hover:text-white">Ver participantes</summary>
+                      <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                        {participants.map(p => (
+                          <li key={p.customerId} className="flex justify-between text-slate-300">
+                            <span>{p.name}</span>
+                            <span className="font-mono text-slate-400">
+                              {p.entries} chance(s) · {tickets ? Math.round((p.entries / tickets) * 100) : 0}%
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+
+                  {isActive && (
+                    <div className="space-y-2 border-t border-slate-800 pt-3">
+                      <div className="flex gap-2">
+                        <select
+                          value={st.customerId}
+                          onChange={(e) => setEnrollState({ ...enrollState, [raffle.id]: { ...st, customerId: e.target.value } })}
+                          className="flex-1 min-w-0 px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white"
+                        >
+                          <option value="">Anotar cliente...</option>
+                          {eligibleCustomers
+                            .filter(c => (c.loyaltyPoints || 0) >= raffle.pointsPerEntry)
+                            .map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.businessName || c.tradeName} ({(c.loyaltyPoints || 0).toLocaleString('es-AR')} pts)
+                              </option>
+                            ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="1"
+                          value={st.entries}
+                          onChange={(e) => setEnrollState({ ...enrollState, [raffle.id]: { ...st, entries: Math.max(1, parseInt(e.target.value) || 1) } })}
+                          className="w-16 px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white font-mono"
+                          title="Cantidad de chances"
+                        />
+                        <button
+                          onClick={() => handleEnroll(raffle)}
+                          disabled={isSubmitting}
+                          className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold"
+                        >
+                          Anotar
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => handleDraw(raffle)}
+                        disabled={isSubmitting || participants.length === 0}
+                        className="w-full py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white text-xs font-bold"
+                      >
+                        Sortear Ganador
+                      </button>
+                    </div>
+                  )}
+
+                  {raffleMsg?.raffleId === raffle.id && (
+                    <div className={`p-2 rounded-lg text-xs ${raffleMsg.ok ? 'bg-emerald-950/40 text-emerald-300' : 'bg-rose-950/40 text-rose-300'}`}>
+                      {raffleMsg.msg}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -654,10 +888,10 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                   </td>
                 </tr>
               ) : (
-                transactions.map(tx => (
+                [...transactions].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(tx => (
                   <tr key={tx.id} className="hover:bg-slate-800/40">
                     <td className="px-4 py-2.5 font-mono text-slate-400">{tx.date}</td>
-                    <td className="px-4 py-2.5 font-medium text-white capitalize">{tx.type.replace('_', ' ')}</td>
+                    <td className="px-4 py-2.5 font-medium text-white capitalize">{tx.type.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-2.5 text-slate-300">{tx.description}</td>
                     <td className={`px-4 py-2.5 font-mono font-bold text-right ${
                       tx.points > 0 ? 'text-emerald-400' : 'text-rose-400'
@@ -744,6 +978,38 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                    Categoría:
+                  </label>
+                  <select
+                    value={rewardForm.category}
+                    onChange={(e) => setRewardForm({ ...rewardForm, category: e.target.value as LoyaltyReward['category'] })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white"
+                  >
+                    <option value="herramientas">Herramientas</option>
+                    <option value="pinturas">Pinturas</option>
+                    <option value="electronica">Electrónica</option>
+                    <option value="merchandising">Merchandising</option>
+                    <option value="descuentos">Descuentos</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
+                    Precio de Referencia ($):
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={rewardForm.referencePriceArs}
+                    onChange={(e) => setRewardForm({ ...rewardForm, referencePriceArs: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono"
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -817,6 +1083,9 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                   Cantidad de Puntos:
                 </label>
+                {adjustType === 'restar' && (
+                  <p className="text-[11px] text-slate-500 mb-1">Saldo actual: {(showAdjustModal.loyaltyPoints || 0).toLocaleString('es-AR')} pts (no se puede dejar en negativo)</p>
+                )}
                 <input
                   type="number"
                   min="1"
@@ -862,6 +1131,167 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
         </div>
       )}
 
+      {/* MODAL: Canje en Mostrador */}
+      {redeemCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-purple-400" />
+                  Canje en Mostrador
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {redeemCustomer.businessName || redeemCustomer.tradeName} ·{' '}
+                  <span className="text-purple-400 font-mono font-bold">
+                    {(customers.find(c => c.id === redeemCustomer.id)?.loyaltyPoints || 0).toLocaleString('es-AR')} pts
+                  </span>
+                </p>
+              </div>
+              <button onClick={() => setRedeemCustomer(null)} className="text-slate-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {redeemResult ? (
+              <div className="text-center space-y-3">
+                <div className="text-emerald-300 font-bold">Canje realizado: {redeemResult.title}</div>
+                <div className="text-2xl font-black font-mono text-white tracking-wider bg-slate-950 p-3 rounded-xl border border-emerald-800 inline-block">
+                  {redeemResult.code}
+                </div>
+                {redeemResult.delivered ? (
+                  <div className="text-xs text-emerald-400 flex items-center justify-center gap-1"><Check className="w-4 h-4" /> Premio entregado</div>
+                ) : (
+                  <div className="flex justify-center gap-2">
+                    <button
+                      onClick={async () => {
+                        const ok = await onValidateCoupon(redeemResult.code);
+                        if (ok) setRedeemResult({ ...redeemResult, delivered: true });
+                        else alert('No se pudo marcar como entregado. Probá desde "Validar & Entregar".');
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl"
+                    >
+                      Entregar ahora
+                    </button>
+                    <button
+                      onClick={() => setRedeemCustomer(null)}
+                      className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-semibold"
+                    >
+                      Entregar después
+                    </button>
+                  </div>
+                )}
+                {redeemResult.delivered && (
+                  <button onClick={() => setRedeemCustomer(null)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-semibold">
+                    Cerrar
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {rewards.filter(r => r.active !== false).length === 0 && (
+                  <p className="text-xs text-slate-500">No hay premios activos en el catálogo.</p>
+                )}
+                {rewards.filter(r => r.active !== false).map(reward => {
+                  const pts = customers.find(c => c.id === redeemCustomer.id)?.loyaltyPoints || 0;
+                  const ok = pts >= reward.pointsCost && reward.stock > 0;
+                  return (
+                    <div key={reward.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <div>
+                        <div className="text-sm font-bold text-white">{reward.title}</div>
+                        <div className="text-[11px] text-slate-500">
+                          {reward.pointsCost} pts · Stock {reward.stock}
+                        </div>
+                      </div>
+                      <button
+                        disabled={!ok || isSubmitting}
+                        onClick={() => handleCounterRedeem(reward)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                          ok ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {reward.stock <= 0 ? 'Sin stock' : pts < reward.pointsCost ? 'Faltan pts' : 'Canjear'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Nuevo Sorteo */}
+      {showNewRaffleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-400" />
+                Nuevo Sorteo
+              </h3>
+              <button onClick={() => setShowNewRaffleModal(false)} className="text-slate-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateRaffleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Título:</label>
+                <input
+                  type="text"
+                  required
+                  value={raffleForm.title}
+                  onChange={(e) => setRaffleForm({ ...raffleForm, title: e.target.value })}
+                  placeholder="ej: Sorteo Día del Padre"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Premio:</label>
+                <textarea
+                  rows={2}
+                  value={raffleForm.prizeDescription}
+                  onChange={(e) => setRaffleForm({ ...raffleForm, prizeDescription: e.target.value })}
+                  placeholder="ej: Taladro percutor 750W + set de mechas"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Fecha del sorteo:</label>
+                  <input
+                    type="date"
+                    required
+                    value={raffleForm.drawDate}
+                    onChange={(e) => setRaffleForm({ ...raffleForm, drawDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Pts por chance:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={raffleForm.pointsPerEntry}
+                    onChange={(e) => setRaffleForm({ ...raffleForm, pointsPerEntry: parseInt(e.target.value) || 1 })}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowNewRaffleModal(false)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-semibold">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={isSubmitting} className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-sm">
+                  {isSubmitting ? 'Creando...' : 'Crear Sorteo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: Administrative Reset Confirmation */}
       {showResetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
@@ -874,7 +1304,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
             <p className="text-xs text-slate-300 leading-relaxed">
               <strong>Regla Maestra:</strong> Este procedimiento resetea a cero los saldos de puntos de todos los clientes (<code>points = 0</code>, <code>totalEarned = 0</code>, <code>totalRedeemed = 0</code>) y limpia el ledger de transacciones. 
               <br/><br/>
-              <strong>Se conservan intactos:</strong> el catálogo de premios, los cupones ya canjeados y los sorteos históricos.
+              <strong>Se conservan intactos:</strong> el catálogo de premios, los cupones ya canjeados, los sorteos históricos y las chances de los sorteos todavía abiertos.
             </p>
 
             <div>

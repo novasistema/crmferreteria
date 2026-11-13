@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   QrCode
 } from 'lucide-react';
-import { Customer, SalesOrder, CompanyConfig, LoyaltyReward } from '../types';
+import { Customer, SalesOrder, CompanyConfig, LoyaltyReward, LoyaltyRaffle } from '../types';
 
 interface CustomerPortalProps {
   customers: Customer[];
@@ -29,6 +29,8 @@ interface CustomerPortalProps {
   onLoginClient: (taxId: string) => void;
   onLogoutClient: () => void;
   onRedeemReward?: (customerId: string, rewardId: string) => Promise<string | null>;
+  raffles?: LoyaltyRaffle[];
+  onEnterRaffle?: (customerId: string, raffleId: string, entries?: number) => Promise<void>;
 }
 
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({
@@ -39,13 +41,20 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   activeClientTaxId,
   onLoginClient,
   onLogoutClient,
-  onRedeemReward
+  onRedeemReward,
+  raffles = [],
+  onEnterRaffle
 }) => {
+  const brandName = config?.tradeName || config?.companyName || 'nuestro negocio';
+  const brandWhatsapp = (config?.whatsappNumber || config?.phone || '').replace(/\D/g, '');
+  const [raffleBusyId, setRaffleBusyId] = useState<string | null>(null);
+  const [raffleMsg, setRaffleMsg] = useState<string | null>(null);
   const [taxIdInput, setTaxIdInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<'shipments' | 'invoices' | 'orders' | 'account' | 'loyalty'>('shipments');
   const [selectedOrderDoc, setSelectedOrderDoc] = useState<SalesOrder | null>(null);
   const [redeemedCouponCode, setRedeemedCouponCode] = useState<string | null>(null);
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
 
   // Authenticated customer
   const currentCustomer = customers.find(c => {
@@ -94,7 +103,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         <div className="flex justify-center mb-4">
           <img 
             src={config?.logoUrl || "/assets/aistudio/colorear-500px_0158e3cb.webp"} 
-            alt={config?.tradeName || "Colorear Pinturas"} 
+            alt={brandName} 
             className="h-12 w-auto max-w-[200px] object-contain"
             onError={(e) => {
               (e.target as HTMLImageElement).src = '/assets/aistudio/colorear-500px_0158e3cb.webp';
@@ -448,13 +457,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             Resumen Financiero de Cuenta Corriente
           </h3>
           <p className="text-xs text-slate-500">
-            Detalle de movimientos, saldo acumulado y datos para transferencias bancarias a Colorear Pinturas S.R.L.
+            Detalle de movimientos, saldo acumulado y datos para transferencias bancarias a {config?.companyName || brandName}.
           </p>
 
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-slate-500">Razón Social:</span>
-              <strong className="text-slate-900">{config?.companyName || 'Colorear Pinturas S.R.L.'}</strong>
+              <strong className="text-slate-900">{config?.companyName || brandName}</strong>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500">CUIT:</span>
@@ -472,7 +481,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
           <div className="flex items-center justify-end">
             <a
-              href={`https://wa.me/5491148907000?text=${encodeURIComponent(`Hola Colorear Pinturas, les escribo desde ${currentCustomer.businessName} (CUIT: ${currentCustomer.taxId}) para enviar comprobante de transferencia bancaria.`)}`}
+              href={`https://wa.me/${brandWhatsapp.startsWith('54') ? brandWhatsapp : `549${brandWhatsapp}`}?text=${encodeURIComponent(`Hola ${brandName}, les escribo desde ${currentCustomer.businessName} (CUIT: ${currentCustomer.taxId}) para enviar comprobante de transferencia bancaria.`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs"
@@ -486,7 +495,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       {/* TAB CONTENT: LOYALTY & POINTS (REGLA DE SECCIÓN 10 DEL PROMPT MAESTRO) */}
       {activeTab === 'loyalty' && (
         <div className="space-y-6">
-          {currentCustomer.hasCurrentAccount ? (
+          {(currentCustomer.hasCurrentAccount || currentCustomer.loyaltyEligible === false) ? (
             /* Cliente con Cuenta Corriente: EXCLUSIÓN OBLIGATORIA */
             <div className="bg-white rounded-3xl border border-amber-200 p-8 shadow-sm text-center space-y-4">
               <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
@@ -500,7 +509,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   Programa de Puntos No Aplicable a Esta Cuenta
                 </h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Estimado cliente, su cuenta opera con condiciones comerciales de <strong>Cuenta Corriente Mayorista</strong> (plazos de pago y bonificaciones de fábrica en remito). De acuerdo al reglamento comercial de Colorear Pinturas, los clientes con cuenta corriente quedan excluidos de la acumulación de puntos de mostrador.
+                  Estimado cliente, su cuenta opera con condiciones comerciales de <strong>Cuenta Corriente Mayorista</strong> (plazos de pago y bonificaciones de fábrica en remito). De acuerdo al reglamento comercial de {brandName}, los clientes con cuenta corriente quedan excluidos de la acumulación de puntos de mostrador.
                 </p>
               </div>
             </div>
@@ -511,7 +520,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <span className="text-xs text-purple-300 font-semibold uppercase tracking-wider block">
-                    Puntos Disponibles del Club Pintor
+                    Puntos Disponibles · Club {brandName}
                   </span>
                   <div className="text-4xl font-black font-mono mt-1 text-white flex items-center gap-2">
                     <Sparkles className="w-8 h-8 text-amber-400" />
@@ -545,7 +554,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   Premios Disponibles para Canjear:
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {rewards.map(reward => {
+                  {rewards.filter(r => r.active !== false).length === 0 && (
+                    <div className="col-span-full text-xs text-slate-500">Por el momento no hay premios disponibles.</div>
+                  )}
+                  {rewards.filter(r => r.active !== false).map(reward => {
                     const canAfford = (currentCustomer.loyaltyPoints || 0) >= reward.pointsCost;
                     return (
                       <div key={reward.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
@@ -565,11 +577,17 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                           <span className="text-xs text-slate-500">Stock: {reward.stock}</span>
                           <button
-                            disabled={!canAfford || reward.stock <= 0}
+                            disabled={!canAfford || reward.stock <= 0 || redeemingId !== null}
                             onClick={async () => {
-                              if (onRedeemReward) {
+                              if (!onRedeemReward || redeemingId) return;
+                              if (!window.confirm(`¿Canjear "${reward.title}" por ${reward.pointsCost} puntos?`)) return;
+                              setRedeemingId(reward.id);
+                              try {
                                 const code = await onRedeemReward(currentCustomer.id, reward.id);
                                 if (code) setRedeemedCouponCode(code);
+                                else alert('No se pudo realizar el canje. Verificá tus puntos y el stock del premio e intentá de nuevo.');
+                              } finally {
+                                setRedeemingId(null);
                               }
                             }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -578,7 +596,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                                 : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                             }`}
                           >
-                            {canAfford ? 'Canjear Premio' : 'Puntos Insuficientes'}
+                            {redeemingId === reward.id ? 'Canjeando...' : reward.stock <= 0 ? 'Sin Stock' : canAfford ? 'Canjear Premio' : 'Puntos Insuficientes'}
                           </button>
                         </div>
                       </div>
@@ -586,6 +604,55 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   })}
                 </div>
               </div>
+
+              {/* Sorteos activos */}
+              {raffles.filter(r => r.status === 'activo').length > 0 && (
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">
+                    Sorteos Abiertos:
+                  </h4>
+                  {raffleMsg && (
+                    <div className="mb-3 p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs text-purple-800">{raffleMsg}</div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {raffles.filter(r => r.status === 'activo').map(raffle => {
+                      const canAfford = (currentCustomer.loyaltyPoints || 0) >= raffle.pointsPerEntry;
+                      return (
+                        <div key={raffle.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-amber-700">Sorteo: {raffle.drawDate}</span>
+                            <span className="font-mono font-bold text-purple-700">{raffle.pointsPerEntry} pts / chance</span>
+                          </div>
+                          <h5 className="font-bold text-slate-900 text-sm">{raffle.title}</h5>
+                          <p className="text-xs text-slate-500">{raffle.prizeDescription}</p>
+                          <button
+                            disabled={!canAfford || raffleBusyId !== null || !onEnterRaffle}
+                            onClick={async () => {
+                              if (!onEnterRaffle) return;
+                              if (!window.confirm(`¿Usar ${raffle.pointsPerEntry} puntos para sumar una chance en "${raffle.title}"?`)) return;
+                              setRaffleBusyId(raffle.id);
+                              setRaffleMsg(null);
+                              try {
+                                await onEnterRaffle(currentCustomer.id, raffle.id, 1);
+                                setRaffleMsg(`¡Listo! Sumaste una chance en "${raffle.title}". Mucha suerte.`);
+                              } catch (err: any) {
+                                setRaffleMsg(err?.message || 'No se pudo anotar en el sorteo.');
+                              } finally {
+                                setRaffleBusyId(null);
+                              }
+                            }}
+                            className={`w-full px-3 py-1.5 rounded-xl text-xs font-bold ${
+                              canAfford ? 'bg-amber-500 hover:bg-amber-600 text-white cursor-pointer' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {raffleBusyId === raffle.id ? 'Anotando...' : canAfford ? 'Sumar una chance' : 'Puntos insuficientes'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

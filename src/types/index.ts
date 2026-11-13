@@ -971,6 +971,8 @@ export interface LoyaltyTransaction {
   referenceId?: string;
   description: string;
   date: string;
+  entries?: number; // chances compradas (solo en sorteo_entrada)
+  customerName?: string;
 }
 
 export interface LoyaltyRaffle {
@@ -983,6 +985,10 @@ export interface LoyaltyRaffle {
   totalEntries: number;
   winnerCustomerId?: string;
   winnerCustomerName?: string;
+  drawnAt?: string;
+  drawnBy?: string;
+  totalTicketsAtDraw?: number;
+  createdAt?: string;
 }
 
 // --- ARQUEO Y SESIÓN DE CAJA REGISTRADORA OPERATIVA ---
