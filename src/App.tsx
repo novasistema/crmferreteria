@@ -42,6 +42,8 @@ import {
   EcommerceSettings,
   FixedExpense,
   Loan,
+  SavingsPlan,
+  FinanceReminder,
   Product, 
   ProductionOrder, 
   SalesOrder, 
@@ -279,6 +281,8 @@ export default function App() {
   const [webOrders, setWebOrders] = useState<WebOrder[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([]);
+  const [financeReminders, setFinanceReminders] = useState<FinanceReminder[]>([]);
   const [activeSellerContext, setActiveSellerContext] = useState<Seller | null>(null);
   const [isMobileSellerAppOpen, setIsMobileSellerAppOpen] = useState(false);
   // Modo Móvil: se abre solo al entrar por /movil
@@ -477,6 +481,14 @@ export default function App() {
           setLoans(snap.docs.map(d => ({ id: d.id, ...d.data() } as Loan)));
         }, error => console.warn('Could not listen to loans:', error));
         unsubscribes.push(unsubLoans);
+        const unsubSavings = onSnapshot(collection(db, 'savings_plans'), snap => {
+          setSavingsPlans(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavingsPlan)));
+        }, error => console.warn('Could not listen to savings_plans:', error));
+        unsubscribes.push(unsubSavings);
+        const unsubReminders = onSnapshot(collection(db, 'finance_reminders'), snap => {
+          setFinanceReminders(snap.docs.map(d => ({ id: d.id, ...d.data() } as FinanceReminder)));
+        }, error => console.warn('Could not listen to finance_reminders:', error));
+        unsubscribes.push(unsubReminders);
 
         // 10. Financial Transactions
         const unsubTx = onSnapshot(collection(db, 'financial_transactions'), snap => {
@@ -2681,6 +2693,32 @@ export default function App() {
               onDeleteLoan={async (id) => {
                 try { await deleteDoc(doc(db, 'loans', id)); }
                 catch (error) { handleFirestoreError(error, OperationType.DELETE, 'loans'); }
+              }}
+              products={products}
+              employees={employees}
+              savingsPlans={savingsPlans}
+              reminders={financeReminders}
+              onSaveFinanceSettings={async (fs) => {
+                const clean = JSON.parse(JSON.stringify(fs));
+                setCompanyConfig(prev => prev ? { ...prev, financeSettings: clean } : prev);
+                try { await setDoc(doc(db, 'company_config', 'main_config'), { financeSettings: clean }, { merge: true }); }
+                catch (error) { handleFirestoreError(error, OperationType.WRITE, 'company_config'); }
+              }}
+              onSaveSavingsPlan={async (p) => {
+                try { await setDoc(doc(db, 'savings_plans', p.id), JSON.parse(JSON.stringify(p))); }
+                catch (error) { handleFirestoreError(error, OperationType.WRITE, 'savings_plans'); }
+              }}
+              onDeleteSavingsPlan={async (id) => {
+                try { await deleteDoc(doc(db, 'savings_plans', id)); }
+                catch (error) { handleFirestoreError(error, OperationType.DELETE, 'savings_plans'); }
+              }}
+              onSaveReminder={async (r) => {
+                try { await setDoc(doc(db, 'finance_reminders', r.id), JSON.parse(JSON.stringify(r))); }
+                catch (error) { handleFirestoreError(error, OperationType.WRITE, 'finance_reminders'); }
+              }}
+              onDeleteReminder={async (id) => {
+                try { await deleteDoc(doc(db, 'finance_reminders', id)); }
+                catch (error) { handleFirestoreError(error, OperationType.DELETE, 'finance_reminders'); }
               }}
               onPayInstallment={async (l, number, amount, cashboxId, paidDate) => {
                 const box = cashboxes.find(b => b.id === cashboxId);

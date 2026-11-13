@@ -517,6 +517,43 @@ export interface CompanyConfig {
   taxSettings?: TaxSettings; // Contador Interno
   ecommerce?: EcommerceSettings; // Tienda Online
   mobileModules?: MobileModuleId[]; // módulos visibles en el Modo Móvil (vacío = todos)
+  financeSettings?: FinanceSettings; // parámetros de la inteligencia financiera
+}
+
+export interface FinanceSettings {
+  cushionMonths: number; // meses de costos fijos que debería cubrir el colchón
+  cushionCashboxIds: string[]; // cajas que se cuentan como reserva
+  employerContribPct: number; // contribuciones patronales %
+  artPct: number; // ART %
+  otherLaborPct: number; // seguro de vida, sindicato, etc. %
+  vacationPct: number; // previsión de vacaciones % del sueldo
+  hoursPerMonth: number;
+  workingDaysPerMonth: number;
+  extraFixedCosts: number; // otros costos fijos mensuales no cargados como gasto fijo
+  includeEmployeesInFixed: boolean;
+  includeLoansInFixed: boolean;
+  defaultMarginPct?: number; // margen a usar si los productos no tienen costo
+}
+
+export interface SavingsContribution { date: string; amount: number; note?: string }
+export interface SavingsPlan {
+  id: string;
+  name: string;
+  goal: number;
+  targetDate?: string;
+  contributions: SavingsContribution[];
+  createdAt: string;
+}
+
+export interface FinanceReminder {
+  id: string;
+  title: string;
+  date: string;
+  amount?: number;
+  repeat: 'no' | 'mensual' | 'anual';
+  done: boolean;
+  notes?: string;
+  createdAt: string;
 }
 
 // --- MODO MÓVIL ---

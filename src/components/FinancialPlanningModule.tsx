@@ -12,7 +12,11 @@ import {
   Wallet,
   ChevronDown,
   ChevronRight,
-  Receipt
+  Receipt,
+  Target,
+  BarChart3,
+  PiggyBank,
+  Users
 } from 'lucide-react';
 import {
   FixedExpense,
@@ -29,8 +33,15 @@ import {
   SalesOrder,
   TaxPeriod,
   Customer,
-  UserRole
+  UserRole,
+  Product,
+  Employee,
+  FinanceSettings,
+  SavingsPlan,
+  FinanceReminder
 } from '../types';
+import { BreakEvenPanel, ComparisonPanel, ReservesPanel, EmployeeCostPanel } from './FinanceIntelligencePanels';
+import { withFinanceDefaults } from '../services/financeIntelligence';
 import {
   projectCashFlow,
   pendingExpenseDues,
@@ -81,9 +92,18 @@ interface Props {
   onSaveLoan: (l: Loan) => Promise<void>;
   onDeleteLoan: (id: string) => Promise<void>;
   onPayInstallment: (l: Loan, number: number, amount: number, cashboxId: string, paidDate: string) => Promise<void>;
+  products: Product[];
+  employees: Employee[];
+  savingsPlans: SavingsPlan[];
+  reminders: FinanceReminder[];
+  onSaveFinanceSettings: (s: FinanceSettings) => Promise<void>;
+  onSaveSavingsPlan: (p: SavingsPlan) => Promise<void>;
+  onDeleteSavingsPlan: (id: string) => Promise<void>;
+  onSaveReminder: (r: FinanceReminder) => Promise<void>;
+  onDeleteReminder: (id: string) => Promise<void>;
 }
 
-type Tab = 'flujo' | 'gastos' | 'prestamos';
+type Tab = 'flujo' | 'equilibrio' | 'comparativo' | 'reservas' | 'empleados' | 'gastos' | 'prestamos';
 
 // Modal para registrar un pago desde una caja
 const PayModal: React.FC<{
@@ -159,10 +179,19 @@ export const FinancialPlanningModule: React.FC<Props> = props => {
       });
   }, [config?.taxSettings, props.taxPeriods, props.vouchers, props.purchaseInvoices, props.salesOrders, today]);
 
-  const flow = useMemo(
-    () => projectCashFlow({ startBalance: cashArs, today, weeks, fixedExpenses, loans, checks, installmentPlans, taxes }),
-    [cashArs, today, weeks, fixedExpenses, loans, checks, installmentPlans, taxes]
+  const reminderOutflows = useMemo(
+    () => props.reminders.filter(r => !r.done && (r.amount || 0) > 0).map(r => ({ date: r.date, amount: r.amount || 0, label: `Recordatorio: ${r.title}` })),
+    [props.reminders]
   );
+  const flow = useMemo(
+    () => projectCashFlow({ startBalance: cashArs, today, weeks, fixedExpenses, loans, checks, installmentPlans, taxes: [...taxes, ...reminderOutflows] }),
+    [cashArs, today, weeks, fixedExpenses, loans, checks, installmentPlans, taxes, reminderOutflows]
+  );
+  const financeSettings = useMemo(() => withFinanceDefaults(config?.financeSettings), [config?.financeSettings]);
+  const common = {
+    salesOrders: props.salesOrders, products: props.products, employees: props.employees, fixedExpenses, loans,
+    settings: financeSettings, canEdit, onSaveSettings: props.onSaveFinanceSettings
+  };
   const maxAbs = Math.max(1, ...flow.weeks.map(w => Math.abs(w.balance)), Math.abs(cashArs));
 
   const tabBtn = (id: Tab, label: string, Icon: React.ElementType) => (
@@ -183,6 +212,10 @@ export const FinancialPlanningModule: React.FC<Props> = props => {
         </div>
         <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-1">
           {tabBtn('flujo', 'Flujo de fondos', TrendingUp)}
+          {tabBtn('equilibrio', 'Punto de equilibrio', Target)}
+          {tabBtn('comparativo', 'Comparativo y proyección', BarChart3)}
+          {tabBtn('reservas', 'Colchón, ahorros y recordatorios', PiggyBank)}
+          {tabBtn('empleados', 'Costo de empleados', Users)}
           {tabBtn('gastos', `Gastos fijos (${fixedExpenses.filter(e => e.active).length})`, Receipt)}
           {tabBtn('prestamos', `Préstamos (${loans.filter(l => l.status === 'vigente').length})`, Landmark)}
         </div>
@@ -252,6 +285,21 @@ export const FinancialPlanningModule: React.FC<Props> = props => {
         </>
       )}
 
+      {tab === 'equilibrio' && <BreakEvenPanel {...common} />}
+      {tab === 'comparativo' && <ComparisonPanel {...common} />}
+      {tab === 'reservas' && (
+        <ReservesPanel
+          {...common}
+          cashboxes={cashboxes}
+          savingsPlans={props.savingsPlans}
+          reminders={props.reminders}
+          onSavePlan={props.onSaveSavingsPlan}
+          onDeletePlan={props.onDeleteSavingsPlan}
+          onSaveReminder={props.onSaveReminder}
+          onDeleteReminder={props.onDeleteReminder}
+        />
+      )}
+      {tab === 'empleados' && <EmployeeCostPanel {...common} />}
       {tab === 'gastos' && <ExpensesPanel {...props} canEdit={canEdit} onPay={(expense, due) => setPaying({ kind: 'gasto', expense, due })} />}
       {tab === 'prestamos' && <LoansPanel {...props} canEdit={canEdit} onPay={(loan, number) => setPaying({ kind: 'cuota', loan, number })} />}
 

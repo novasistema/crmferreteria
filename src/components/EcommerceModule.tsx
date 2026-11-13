@@ -15,7 +15,8 @@ import {
   Loader2,
   CreditCard,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  BarChart3
 } from 'lucide-react';
 import { CompanyConfig, Product, WebOrder, WebOrderStatus, EcommerceSettings, UserRole } from '../types';
 import {
@@ -41,7 +42,7 @@ interface EcommerceModuleProps {
   onConvertToSale: (order: WebOrder, billing: 'arca' | 'no_arca') => Promise<string>;
 }
 
-type Tab = 'pedidos' | 'productos' | 'config';
+type Tab = 'pedidos' | 'estadisticas' | 'productos' | 'config';
 const STATUS_FLOW: WebOrderStatus[] = ['nuevo', 'confirmado', 'pagado', 'preparando', 'enviado', 'entregado', 'cancelado'];
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -86,12 +87,14 @@ export const EcommerceModule: React.FC<EcommerceModuleProps> = ({ config, produc
         </div>
         <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-1">
           {tabBtn('pedidos', 'Pedidos web', ClipboardList, newCount)}
+          {tabBtn('estadisticas', 'Estadísticas', BarChart3)}
           {tabBtn('productos', 'Productos publicados', Package)}
           {tabBtn('config', 'Configuración', Settings2)}
         </div>
       </div>
 
       {tab === 'pedidos' && <OrdersPanel orders={orders} settings={s} onUpdateOrder={onUpdateOrder} onConvertToSale={onConvertToSale} />}
+      {tab === 'estadisticas' && <StatsPanel orders={orders} />}
       {tab === 'productos' && <ProductsPanel products={products} settings={s} onUpdateProducts={onUpdateProducts} />}
       {tab === 'config' && <SettingsPanel settings={s} canEdit={canConfigure} onSave={onSaveSettings} />}
     </div>
@@ -258,6 +261,113 @@ const OrdersPanel: React.FC<{
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+// ---------------- Estadísticas ----------------
+const localDay = (iso: string) => new Date(new Date(iso).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+const ADVANCED: WebOrderStatus[] = ['pagado', 'preparando', 'enviado', 'entregado'];
+
+export const computeStoreStats = (orders: WebOrder[], days: number, now = Date.now()) => {
+  const today = localDay(new Date(now).toISOString());
+  const from = localDay(new Date(now - (days - 1) * 86400000).toISOString());
+  const inRange = orders.filter(o => { const d = localDay(o.createdAt); return d >= from && d <= today; });
+  const valid = inRange.filter(o => o.status !== 'cancelado');
+  const revenue = valid.reduce((a, o) => a + o.total, 0);
+  const daysList = Array.from({ length: days }, (_, i) => localDay(new Date(now - (days - 1 - i) * 86400000).toISOString()));
+  const byDay = daysList.map(d => {
+    const list = valid.filter(o => localDay(o.createdAt) === d);
+    return { day: d, count: list.length, amount: list.reduce((a, o) => a + o.total, 0) };
+  });
+  const products = new Map<string, { name: string; qty: number; amount: number }>();
+  valid.forEach(o => o.items.forEach(it => {
+    const cur = products.get(it.productId) || { name: `${it.name} ${it.presentation || ''}`.trim(), qty: 0, amount: 0 };
+    cur.qty += it.quantity;
+    cur.amount += it.subtotal * (1 + it.ivaRate / 100);
+    products.set(it.productId, cur);
+  }));
+  const split = <K extends string>(key: (o: WebOrder) => K) => {
+    const m = new Map<K, { count: number; amount: number }>();
+    valid.forEach(o => { const k = key(o); const c = m.get(k) || { count: 0, amount: 0 }; c.count++; c.amount += o.total; m.set(k, c); });
+    return [...m.entries()].map(([k, v]) => ({ key: k, ...v })).sort((a, b) => b.amount - a.amount);
+  };
+  const customers = new Set(valid.map(o => (o.customerPhone || '').replace(/\D/g, '').slice(-8) || o.customerName));
+  return {
+    count: valid.length,
+    revenue,
+    avgTicket: valid.length ? revenue / valid.length : 0,
+    paidRate: valid.length ? valid.filter(o => ADVANCED.includes(o.status)).length / valid.length : 0,
+    cancelled: inRange.length - valid.length,
+    pendingNew: valid.filter(o => o.status === 'nuevo').length,
+    uniqueCustomers: customers.size,
+    byDay,
+    topProducts: [...products.values()].sort((a, b) => b.qty - a.qty || b.amount - a.amount).slice(0, 10),
+    byPayment: split(o => o.payment),
+    byDelivery: split(o => o.delivery)
+  };
+};
+
+const StatsPanel: React.FC<{ orders: WebOrder[] }> = ({ orders }) => {
+  const [days, setDays] = useState(30);
+  const st = useMemo(() => computeStoreStats(orders, days), [orders, days]);
+  const maxDay = Math.max(1, ...st.byDay.map(d => d.amount));
+  const kpi = (label: string, value: string, sub?: string) => (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4">
+      <div className="text-[11px] font-bold uppercase text-slate-400">{label}</div>
+      <div className="text-xl font-black font-mono text-slate-900">{value}</div>
+      {sub && <div className="text-[11px] text-slate-500">{sub}</div>}
+    </div>
+  );
+  const splitBlock = (title: string, rows: { key: string; count: number; amount: number }[], labels: Record<string, string>) => (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <h3 className="font-extrabold text-slate-900 mb-3">{title}</h3>
+      {rows.length === 0 && <p className="text-sm text-slate-400">Sin datos</p>}
+      {rows.map(r => (
+        <div key={r.key} className="mb-2">
+          <div className="flex justify-between text-sm"><span>{labels[r.key] || r.key} · {r.count}</span><span className="font-mono">{money(r.amount)}</span></div>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-pink-500" style={{ width: `${st.revenue ? (r.amount / st.revenue) * 100 : 0}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <select value={days} onChange={e => setDays(Number(e.target.value))} className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white">
+          <option value={7}>Últimos 7 días</option><option value={30}>Últimos 30 días</option><option value={90}>Últimos 90 días</option>
+        </select>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {kpi('Pedidos', String(st.count), st.cancelled ? `${st.cancelled} cancelados aparte` : undefined)}
+        {kpi('Facturación', money(st.revenue), `${st.uniqueCustomers} clientes distintos`)}
+        {kpi('Ticket promedio', money(st.avgTicket))}
+        {kpi('Pagados o avanzados', `${Math.round(st.paidRate * 100)} %`, st.pendingNew ? `${st.pendingNew} nuevos sin atender` : 'Todos atendidos')}
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="font-extrabold text-slate-900 mb-3">Ventas por día</h3>
+        <div className="flex items-end gap-[3px] h-40">
+          {st.byDay.map(d => (
+            <div key={d.day} className="flex-1 h-full flex flex-col justify-end group relative" title={`${d.day.split('-').reverse().join('/')}: ${d.count} pedidos · ${money(d.amount)}`}>
+              <div className={`rounded-t ${d.amount ? 'bg-pink-500 group-hover:bg-pink-600' : 'bg-slate-100'}`} style={{ height: `${d.amount ? Math.max(4, (d.amount / maxDay) * 100) : 2}%` }} />
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between text-[10px] text-slate-400 mt-1"><span>{st.byDay[0]?.day.split('-').reverse().join('/')}</span><span>Hoy</span></div>
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-1 bg-white rounded-2xl border border-slate-200 p-5">
+          <h3 className="font-extrabold text-slate-900 mb-3">Más vendidos</h3>
+          {st.topProducts.length === 0 && <p className="text-sm text-slate-400">Sin ventas en el período</p>}
+          <ol className="space-y-1.5">
+            {st.topProducts.map((p, i) => (
+              <li key={i} className="flex justify-between gap-2 text-sm"><span className="truncate"><b className="text-slate-400 mr-1">{i + 1}.</b>{p.name}</span><span className="shrink-0 font-mono text-xs">{p.qty} u · {money(p.amount)}</span></li>
+            ))}
+          </ol>
+        </div>
+        {splitBlock('Formas de pago', st.byPayment, PAYMENT_LABEL)}
+        {splitBlock('Entrega', st.byDelivery, { retiro: 'Retiro en el local', envio: 'Envío' })}
       </div>
     </div>
   );
