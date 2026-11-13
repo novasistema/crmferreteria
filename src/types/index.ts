@@ -516,6 +516,69 @@ export interface CompanyConfig {
   arcaLastTest?: ArcaConnectionTest;
   taxSettings?: TaxSettings; // Contador Interno
   ecommerce?: EcommerceSettings; // Tienda Online
+  mobileModules?: MobileModuleId[]; // módulos visibles en el Modo Móvil (vacío = todos)
+}
+
+// --- MODO MÓVIL ---
+export type MobileModuleId = 'pos' | 'products' | 'clients' | 'balances' | 'orders' | 'suppliers' | 'expenses';
+
+// --- PLANIFICACIÓN FINANCIERA ---
+export type ExpenseFrequency = 'semanal' | 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
+
+export interface FixedExpensePayment {
+  dueDate: string; // vencimiento que se pagó (YYYY-MM-DD)
+  paidDate: string;
+  amount: number;
+  cashboxId?: string;
+  movementId?: string;
+}
+
+export interface FixedExpense {
+  id: string;
+  name: string; // Alquiler, Luz, Internet, Contador...
+  category: CashMovementCategory;
+  amount: number; // importe estimado de cada vencimiento
+  frequency: ExpenseFrequency;
+  dueDay: number; // día del mes (o día de la semana 1-7 si es semanal)
+  startDate: string;
+  endDate?: string;
+  defaultCashboxId?: string;
+  provider?: string;
+  active: boolean;
+  notes?: string;
+  payments: FixedExpensePayment[];
+  createdAt: string;
+}
+
+export type LoanKind = 'banco' | 'financiera' | 'proveedor' | 'particular' | 'tarjeta' | 'otro';
+
+export interface LoanInstallment {
+  number: number;
+  dueDate: string;
+  amount: number; // cuota total
+  capital: number;
+  interest: number;
+  paid: boolean;
+  paidDate?: string;
+  paidAmount?: number;
+  cashboxId?: string;
+  movementId?: string;
+}
+
+export interface Loan {
+  id: string;
+  lender: string;
+  kind: LoanKind;
+  principal: number;
+  currency: 'ARS' | 'USD';
+  annualRate: number; // TNA %
+  system: 'frances' | 'cuota_fija';
+  startDate: string;
+  installments: LoanInstallment[];
+  defaultCashboxId?: string;
+  status: 'vigente' | 'cancelado';
+  notes?: string;
+  createdAt: string;
 }
 
 // --- TIENDA ONLINE (E-COMMERCE) ---
@@ -703,6 +766,8 @@ export type ModuleKey =
   | 'accounting'
   | 'tax_accountant'
   | 'ecommerce'
+  | 'mobile_mode'
+  | 'financial_planning'
   | 'profitability'
   | 'employees'
   | 'logistics'

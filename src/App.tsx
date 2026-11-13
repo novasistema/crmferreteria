@@ -40,6 +40,8 @@ import {
   TaxSettings,
   WebOrder,
   EcommerceSettings,
+  FixedExpense,
+  Loan,
   Product, 
   ProductionOrder, 
   SalesOrder, 
@@ -83,6 +85,8 @@ import { ProductionModule } from './components/ProductionModule';
 import { ColorRecipesModule } from './components/ColorRecipesModule';
 import { TaxAccountantModule } from './components/TaxAccountantModule';
 import { EcommerceModule } from './components/EcommerceModule';
+import { FinancialPlanningModule } from './components/FinancialPlanningModule';
+import { MobileModeApp } from './components/MobileModeApp';
 import { seedColorRecipesDemoIfNeeded } from './services/colorRecipesDemoSeed';
 import { SalesOrdersModule } from './components/SalesOrdersModule';
 import { SellersModule } from './components/SellersModule';
@@ -166,6 +170,8 @@ export default function App() {
       case 'accounting': return 'Contabilidad & IVA';
       case 'tax_accountant': return 'Contador Interno';
       case 'ecommerce': return 'Tienda Online';
+      case 'financial_planning': return 'Planificación Financiera';
+      case 'mobile_mode': return 'Modo Móvil';
       case 'profitability': return 'Estado de Resultados';
       case 'employees': return 'Personal & Sueldos';
       case 'installments': return 'Cuotas Internas';
@@ -271,8 +277,12 @@ export default function App() {
   const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>([]);
   const [taxPeriods, setTaxPeriods] = useState<TaxPeriod[]>([]);
   const [webOrders, setWebOrders] = useState<WebOrder[]>([]);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
   const [activeSellerContext, setActiveSellerContext] = useState<Seller | null>(null);
   const [isMobileSellerAppOpen, setIsMobileSellerAppOpen] = useState(false);
+  // Modo Móvil: se abre solo al entrar por /movil
+  const [isMobileModeOpen, setIsMobileModeOpen] = useState(() => window.location.pathname.replace(/\/+$/, '') === '/movil');
 
   // Active Draft Supplier Order state (shared between Inventory and SupplierOrdersModule)
   const [supplierOrderDraft, setSupplierOrderDraft] = useState<PurchaseOrderItem[]>([]);
@@ -457,6 +467,16 @@ export default function App() {
           console.warn('Could not listen to web_orders:', error);
         });
         unsubscribes.push(unsubWebOrders);
+
+        // 9e. Planificación financiera: gastos fijos y préstamos
+        const unsubFixed = onSnapshot(collection(db, 'fixed_expenses'), snap => {
+          setFixedExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() } as FixedExpense)));
+        }, error => console.warn('Could not listen to fixed_expenses:', error));
+        unsubscribes.push(unsubFixed);
+        const unsubLoans = onSnapshot(collection(db, 'loans'), snap => {
+          setLoans(snap.docs.map(d => ({ id: d.id, ...d.data() } as Loan)));
+        }, error => console.warn('Could not listen to loans:', error));
+        unsubscribes.push(unsubLoans);
 
         // 10. Financial Transactions
         const unsubTx = onSnapshot(collection(db, 'financial_transactions'), snap => {
@@ -1215,6 +1235,97 @@ export default function App() {
     }
   };
 
+  // Guarda una venta (POS, Modo Móvil, pedidos): saldo del cliente, caja, puntos y stock
+  const handleCreateSalesOrder = async (order: SalesOrder, cashboxId?: string, paymentMethod?: string) => {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'sales_orders', order.id), order);
+
+    const cust = customers.find(c => c.id === order.customerId);
+    if (cust && order.paymentStatus !== 'pagado') {
+      batch.update(doc(db, 'customers', cust.id), {
+        currentBalance: increment(order.total)
+      });
+    }
+
+    // If cash payment and cashbox selected, record cash movement
+    if (cashboxId && paymentMethod === 'efectivo' && order.paymentStatus === 'pagado') {
+      const targetBox = cashboxes.find(b => b.id === cashboxId);
+      if (targetBox) {
+        batch.update(doc(db, 'cashboxes', targetBox.id), {
+          currentBalance: increment(order.total),
+          updatedAt: new Date().toISOString()
+        });
+
+        const movId = `cmov-${Date.now()}`;
+        batch.set(doc(db, 'cash_movements', movId), {
+          id: movId,
+          cashboxId: targetBox.id,
+          cashboxName: targetBox.name,
+          type: 'ingreso',
+          amount: order.total,
+          category: 'venta_mostrador',
+          concept: `Cobro en mostrador Venta ${order.orderNumber} - ${order.customerName}`,
+          date: new Date().toISOString().split('T')[0],
+          referenceNumber: order.invoiceNumber || order.orderNumber,
+          user: currentUser?.name || 'Ventas Mostrador',
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+
+    // REGLA EXACTA SECCIÓN 10 PROMPT MAESTRO:
+    // - pointsPerCurrency = 0.01 (1 punto cada $100)
+    // - Los clientes con hasCurrentAccount === true quedan SIEMPRE EXCLUIDOS
+    // - referenceType: "sale" y referenceId
+    if (cust && !cust.hasCurrentAccount && cust.loyaltyEligible !== false) {
+      const pointsEarned = Math.floor(order.total * 0.01);
+      if (pointsEarned > 0) {
+        batch.update(doc(db, 'customers', cust.id), {
+          loyaltyPoints: increment(pointsEarned),
+          loyaltyTotalEarned: increment(pointsEarned)
+        });
+
+        const txId = `ltx-sale-${order.id}`;
+        batch.set(doc(db, 'loyalty_transactions', txId), {
+          id: txId,
+          customerId: cust.id,
+          type: 'acumulacion_compra',
+          points: pointsEarned,
+          referenceType: 'sale',
+          referenceId: order.id,
+          description: `Puntos por compra contado en Pedido ${order.orderNumber} ($${order.total.toLocaleString('es-AR')})`,
+          date: new Date().toISOString().split('T')[0]
+        });
+      }
+    }
+
+
+    // Venta entregada en el acto (mostrador / móvil): descuenta stock y deja el movimiento en el kardex
+    if (order.status === 'entregado') {
+      order.items.forEach((it, idx) => {
+        const qty = Number(it.deliveredQuantity ?? it.quantity) || 0;
+        if (qty <= 0 || !products.some(p => p.id === it.productId)) return;
+        batch.update(doc(db, 'products', it.productId), { stock: increment(-qty) });
+        const movId = `mov-vta-${order.id}-${idx}`;
+        batch.set(doc(db, 'inventory_movements', movId), {
+          id: movId,
+          itemType: 'product',
+          itemId: it.productId,
+          itemName: it.productName,
+          movementType: 'salida_venta',
+          quantity: -qty,
+          unit: 'unidades',
+          reference: `Venta ${order.orderNumber} - ${order.customerName}`,
+          batchNumber: it.batchNumber || '',
+          user: currentUser?.name || 'Ventas',
+          date: new Date().toISOString()
+        });
+      });
+    }
+
+    await batch.commit();
+  };
+
   const handleAddCashMovement = async (mov: CashMovement) => {
     try {
       const batch = writeBatch(db);
@@ -1834,7 +1945,7 @@ export default function App() {
     'desktop', 'reports', 'ai_assistant', 'production', 'color_recipes', 'purchases', 'prices',
     'sales', 'sellers', 'customers', 'installments', 'loyalty', 'logistics',
     'customer_portal', 'finances', 'checks', 'cashboxes', 'arca_fiscal',
-    'accounting', 'tax_accountant', 'ecommerce', 'profitability', 'employees', 'users', 'settings'
+    'accounting', 'tax_accountant', 'financial_planning', 'ecommerce', 'mobile_mode', 'profitability', 'employees', 'users', 'settings'
   ];
 
   const activeModulesCount = ALL_MODULES_LIST.filter(k => isModuleOn(companyConfig?.systemModuleToggles, k)).length;
@@ -1865,6 +1976,38 @@ export default function App() {
           <span>Conectando con base de datos en tiempo real Firestore...</span>
         </div>
       </div>
+    );
+  }
+
+  // Modo Móvil completo (vender, productos, clientes, saldos, pedidos, proveedores, gastos)
+  if (isMobileModeOpen && currentUser && (currentUser.role === 'creador' || isModuleOn(companyConfig?.systemModuleToggles, 'mobile_mode'))) {
+    return (
+      <>
+        <ConnectionStatus />
+        <MobileModeApp
+          currentUser={currentUser}
+          config={companyConfig}
+          products={products}
+          customers={customers}
+          suppliers={suppliers}
+          salesOrders={salesOrders}
+          cashboxes={cashboxes}
+          onExit={() => {
+            setIsMobileModeOpen(false);
+            if (window.location.pathname.startsWith('/movil')) window.history.replaceState(null, '', '/');
+          }}
+          onLogout={() => { setIsMobileModeOpen(window.location.pathname.startsWith('/movil')); handleLogout(); }}
+          onCreateSale={handleCreateSalesOrder}
+          onRecordPayment={(customerId, amount, method, concept) => handleRecordCustomerPayment(customerId, amount, method, concept)}
+          onAddExpense={handleAddCashMovement}
+          onSaveMobileModules={async (ids) => {
+            try {
+              await setDoc(doc(db, 'company_config', 'main_config'), { mobileModules: ids }, { merge: true });
+              setCompanyConfig(prev => prev ? { ...prev, mobileModules: ids } : prev);
+            } catch (error) { handleFirestoreError(error, OperationType.WRITE, 'company_config'); }
+          }}
+        />
+      </>
     );
   }
 
@@ -1967,6 +2110,7 @@ export default function App() {
         onExitPortal={handleLogoutClient}
         onOpenCustomerPortalModal={() => handleSelectModuleWithTab('customer_portal')}
         onOpenMobileSellerApp={() => setIsMobileSellerAppOpen(true)}
+        onOpenMobileMode={() => setIsMobileModeOpen(true)}
         onOpenCreatorModuleControl={openCreatorModuleControl}
         onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         activeModulesCount={activeModulesCount}
@@ -2090,71 +2234,7 @@ export default function App() {
               quotes={quotes}
               standaloneRemitos={standaloneRemitos}
               config={companyConfig}
-              onCreateOrder={async (order, cashboxId, paymentMethod) => {
-                const batch = writeBatch(db);
-                batch.set(doc(db, 'sales_orders', order.id), order);
-
-                const cust = customers.find(c => c.id === order.customerId);
-                if (cust && order.paymentStatus !== 'pagado') {
-                  batch.update(doc(db, 'customers', cust.id), {
-                    currentBalance: increment(order.total)
-                  });
-                }
-
-                // If cash payment and cashbox selected, record cash movement
-                if (cashboxId && paymentMethod === 'efectivo' && order.paymentStatus === 'pagado') {
-                  const targetBox = cashboxes.find(b => b.id === cashboxId);
-                  if (targetBox) {
-                    batch.update(doc(db, 'cashboxes', targetBox.id), {
-                      currentBalance: increment(order.total),
-                      updatedAt: new Date().toISOString()
-                    });
-
-                    const movId = `cmov-${Date.now()}`;
-                    batch.set(doc(db, 'cash_movements', movId), {
-                      id: movId,
-                      cashboxId: targetBox.id,
-                      cashboxName: targetBox.name,
-                      type: 'ingreso',
-                      amount: order.total,
-                      category: 'venta_mostrador',
-                      concept: `Cobro en mostrador Venta ${order.orderNumber} - ${order.customerName}`,
-                      date: new Date().toISOString().split('T')[0],
-                      referenceNumber: order.invoiceNumber || order.orderNumber,
-                      user: currentUser?.name || 'Ventas Mostrador',
-                      createdAt: new Date().toISOString()
-                    });
-                  }
-                }
-
-                // REGLA EXACTA SECCIÓN 10 PROMPT MAESTRO:
-                // - pointsPerCurrency = 0.01 (1 punto cada $100)
-                // - Los clientes con hasCurrentAccount === true quedan SIEMPRE EXCLUIDOS
-                // - referenceType: "sale" y referenceId
-                if (cust && !cust.hasCurrentAccount && cust.loyaltyEligible !== false) {
-                  const pointsEarned = Math.floor(order.total * 0.01);
-                  if (pointsEarned > 0) {
-                    batch.update(doc(db, 'customers', cust.id), {
-                      loyaltyPoints: increment(pointsEarned),
-                      loyaltyTotalEarned: increment(pointsEarned)
-                    });
-
-                    const txId = `ltx-sale-${order.id}`;
-                    batch.set(doc(db, 'loyalty_transactions', txId), {
-                      id: txId,
-                      customerId: cust.id,
-                      type: 'acumulacion_compra',
-                      points: pointsEarned,
-                      referenceType: 'sale',
-                      referenceId: order.id,
-                      description: `Puntos por compra contado en Pedido ${order.orderNumber} ($${order.total.toLocaleString('es-AR')})`,
-                      date: new Date().toISOString().split('T')[0]
-                    });
-                  }
-                }
-
-                await batch.commit();
-              }}
+              onCreateOrder={handleCreateSalesOrder}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onDeliverOrderItems={handleDeliverOrderItems}
               onRecordOrderPayment={async (orderId, amount) => {
@@ -2559,6 +2639,60 @@ export default function App() {
               onSaveCashbox={handleSaveCashbox}
               onAddMovement={handleAddCashMovement}
               onTransferBetweenCashboxes={handleTransferBetweenCashboxes}
+            />
+          )}
+
+          {activeModule === 'financial_planning' && (
+            <FinancialPlanningModule
+              fixedExpenses={fixedExpenses}
+              loans={loans}
+              cashboxes={cashboxes}
+              checks={checks}
+              installmentPlans={internalInstallments}
+              customers={customers}
+              config={companyConfig}
+              vouchers={arcaVouchers}
+              purchaseInvoices={purchaseInvoices}
+              salesOrders={salesOrders}
+              taxPeriods={taxPeriods}
+              currentUserRole={currentUser?.role}
+              onSaveExpense={async (e) => {
+                try { await setDoc(doc(db, 'fixed_expenses', e.id), JSON.parse(JSON.stringify(e))); }
+                catch (error) { handleFirestoreError(error, OperationType.WRITE, 'fixed_expenses'); }
+              }}
+              onDeleteExpense={async (id) => {
+                try { await deleteDoc(doc(db, 'fixed_expenses', id)); }
+                catch (error) { handleFirestoreError(error, OperationType.DELETE, 'fixed_expenses'); }
+              }}
+              onPayExpense={async (e, dueDate, amount, cashboxId, paidDate) => {
+                const box = cashboxes.find(b => b.id === cashboxId);
+                const movId = `mov-fx-${e.id}-${dueDate}`;
+                await handleAddCashMovement({
+                  id: movId, cashboxId, cashboxName: box?.name || '', type: 'egreso', amount,
+                  category: e.category, concept: `${e.name}${e.provider ? ` (${e.provider})` : ''} · vto ${dueDate.split('-').reverse().join('/')}`,
+                  date: paidDate, user: currentUser?.name || 'Finanzas', createdAt: new Date().toISOString()
+                });
+                await setDoc(doc(db, 'fixed_expenses', e.id), JSON.parse(JSON.stringify({ ...e, payments: [...(e.payments || []), { dueDate, paidDate, amount, cashboxId, movementId: movId }] })));
+              }}
+              onSaveLoan={async (l) => {
+                try { await setDoc(doc(db, 'loans', l.id), JSON.parse(JSON.stringify(l))); }
+                catch (error) { handleFirestoreError(error, OperationType.WRITE, 'loans'); }
+              }}
+              onDeleteLoan={async (id) => {
+                try { await deleteDoc(doc(db, 'loans', id)); }
+                catch (error) { handleFirestoreError(error, OperationType.DELETE, 'loans'); }
+              }}
+              onPayInstallment={async (l, number, amount, cashboxId, paidDate) => {
+                const box = cashboxes.find(b => b.id === cashboxId);
+                const movId = `mov-loan-${l.id}-${number}`;
+                await handleAddCashMovement({
+                  id: movId, cashboxId, cashboxName: box?.name || '', type: 'egreso', amount,
+                  category: 'otros_egresos', concept: `Cuota ${number}/${l.installments.length} préstamo ${l.lender}`,
+                  date: paidDate, user: currentUser?.name || 'Finanzas', createdAt: new Date().toISOString()
+                });
+                const installments = l.installments.map(i => i.number === number ? { ...i, paid: true, paidDate, paidAmount: amount, cashboxId, movementId: movId } : i);
+                await setDoc(doc(db, 'loans', l.id), JSON.parse(JSON.stringify({ ...l, installments, status: installments.every(i => i.paid) ? 'cancelado' : l.status })));
+              }}
             />
           )}
 

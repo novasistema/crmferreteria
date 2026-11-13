@@ -315,6 +315,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Cuánto pagar de IVA e IIBB, VEP y vencimientos'
         },
         {
+          key: 'financial_planning',
+          label: 'Planificación Financiera',
+          icon: TrendingUp,
+          badge: 'Flujo',
+          badgeColor: 'bg-teal-900/60 text-teal-300 border border-teal-700/50',
+          desc: 'Flujo proyectado, gastos fijos y préstamos'
+        },
+        {
           key: 'ecommerce',
           label: 'Tienda Online',
           icon: ShoppingCart,

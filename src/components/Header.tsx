@@ -63,6 +63,7 @@ interface HeaderProps {
   onExitPortal: () => void;
   onOpenCustomerPortalModal: () => void;
   onOpenMobileSellerApp?: () => void;
+  onOpenMobileMode?: () => void;
   onOpenCreatorModuleControl?: () => void;
   onOpenGlobalSearch?: () => void;
   activeModulesCount?: number;
@@ -85,6 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExitPortal,
   onOpenCustomerPortalModal,
   onOpenMobileSellerApp,
+  onOpenMobileMode,
   onOpenCreatorModuleControl,
   onOpenGlobalSearch,
   activeModulesCount
@@ -359,6 +361,24 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                   </button>
 
+                  {onOpenMobileMode && (isCreatorUser || isModuleOn('mobile_mode')) && (
+                    <button
+                      onClick={() => {
+                        onOpenMobileMode();
+                        setActiveDropdown(null);
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center justify-between gap-2.5 transition-colors group text-sky-300 hover:bg-slate-800 hover:text-sky-200"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Smartphone className="w-4 h-4 text-sky-300 shrink-0" />
+                        <span className="truncate font-semibold">Modo Móvil</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-sky-950/60 border border-sky-500/30 text-sky-300 shrink-0 font-bold">
+                        {!isModuleOn('mobile_mode') ? 'OFF' : '/movil'}
+                      </span>
+                    </button>
+                  )}
+
                   {onOpenMobileSellerApp && (
                     <button
                       onClick={() => {
@@ -609,7 +629,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
                   activeDropdown === 'admin' || [
                     'purchases', 'cashboxes', 'checks', 'finances', 
-                    'accounting', 'tax_accountant', 'profitability', 'employees', 
+                    'accounting', 'tax_accountant', 'financial_planning', 'profitability', 'employees', 
                     'installments', 'loyalty', 'logistics'
                   ].includes(activeModule)
                     ? 'bg-slate-800 text-orange-400 font-bold'
@@ -709,6 +729,25 @@ export const Header: React.FC<HeaderProps> = ({
                       F.2002
                     </span>
                   </button>
+
+                  {(isCreatorUser || isModuleOn('financial_planning')) && (
+                    <button
+                      onClick={() => handleNavigate('financial_planning')}
+                      className={`w-full text-left px-3.5 py-2 flex items-center justify-between gap-2.5 transition-colors group ${
+                        activeModule === 'financial_planning'
+                          ? 'text-orange-400 bg-orange-950/40 font-bold hover:bg-orange-950/70'
+                          : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <TrendingUp className={`w-4 h-4 transition-colors shrink-0 ${activeModule === 'financial_planning' ? 'text-orange-500' : 'text-teal-400 group-hover:text-white'}`} />
+                        <span className="truncate">Planificación Financiera</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-teal-950/60 border border-teal-500/30 text-teal-300 shrink-0">
+                        {!isModuleOn('financial_planning') ? 'OFF' : 'FLUJO'}
+                      </span>
+                    </button>
+                  )}
 
                   {(isCreatorUser || isModuleOn('tax_accountant')) && (
                     <button
@@ -1273,6 +1312,22 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 Contabilidad & IVA
               </button>
+              {(isCreatorUser || isModuleOn('financial_planning')) && (
+                <button
+                  onClick={() => { handleNavigate('financial_planning'); setIsMobileNavOpen(false); }}
+                  className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-teal-300 font-semibold"
+                >
+                  Planificación Financiera
+                </button>
+              )}
+              {onOpenMobileMode && (isCreatorUser || isModuleOn('mobile_mode')) && (
+                <button
+                  onClick={() => { onOpenMobileMode(); setIsMobileNavOpen(false); }}
+                  className="text-left px-2 py-1.5 rounded hover:bg-slate-800 text-sky-300 font-semibold"
+                >
+                  Modo Móvil
+                </button>
+              )}
               {(isCreatorUser || isModuleOn('tax_accountant')) && (
                 <button
                   onClick={() => { handleNavigate('tax_accountant'); setIsMobileNavOpen(false); }}

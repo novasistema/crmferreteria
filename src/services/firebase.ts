@@ -699,7 +699,7 @@ export const INITIAL_FACTORY_USERS: AppUser[] = [
     allowedModules: [
       'desktop', 'production', 'color_recipes', 'sales', 'sellers', 'prices', 'customers',
       'installments', 'loyalty', 'checks', 'cashboxes', 'arca_fiscal',
-      'accounting', 'tax_accountant', 'profitability', 'employees', 'logistics', 'purchases',
+      'accounting', 'tax_accountant', 'financial_planning', 'mobile_mode', 'profitability', 'employees', 'logistics', 'purchases',
       'finances', 'reports', 'customer_portal', 'ai_assistant', 'settings', 'users'
     ],
     createdAt: new Date().toISOString()
