@@ -39,8 +39,9 @@ import {
   Receipt as ReceiptIcon,
   Smartphone
 } from 'lucide-react';
-import { ModuleKey } from '../types';
+import { BusinessProfileId, ModuleKey, SubscriptionInfo, SubscriptionPlanId } from '../types';
 import { isModuleOn, OPT_IN_MODULES } from '../utils/modules';
+import { PLANS, modulesFor, countBillableUsers } from '../utils/plans';
 
 interface CreatorModuleControlModalProps {
   isOpen: boolean;
@@ -53,6 +54,9 @@ interface CreatorModuleControlModalProps {
   onLock?: () => void;
   onOpenArcaSetup?: () => void;
   arcaReady?: boolean;
+  subscription?: SubscriptionInfo;
+  onSaveSubscription?: (sub: SubscriptionInfo) => Promise<void>;
+  users?: { role: string; active: boolean }[];
 }
 
 interface ModuleMeta {
@@ -319,7 +323,10 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
   onChangePassword,
   onLock,
   onOpenArcaSetup,
-  arcaReady
+  arcaReady,
+  subscription,
+  onSaveSubscription,
+  users = []
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -389,60 +396,60 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
     }
   };
 
-  // Perfiles de negocio: dejan el sistema listo según el tipo de cliente
+  // Perfiles de negocio: dicen si el cliente usa recetas de color y producción
   const BUSINESS_PROFILES: {
-    id: string;
+    id: BusinessProfileId;
     label: string;
     desc: string;
     icon: React.ElementType;
-    off: ModuleKey[];
     tone: string;
   }[] = [
-    {
-      id: 'ferreteria',
-      label: 'Ferretería',
-      desc: 'Sin producción ni recetas de color',
-      icon: Hammer,
-      off: ['production', 'color_recipes'],
-      tone: 'bg-orange-50 border-orange-200 text-orange-900 hover:bg-orange-100'
-    },
-    {
-      id: 'pintureria',
-      label: 'Pinturería (venta + tintométrico)',
-      desc: 'Recetas de color sí, planta industrial no',
-      icon: PaintBucket,
-      off: ['production'],
-      tone: 'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-900 hover:bg-fuchsia-100'
-    },
-    {
-      id: 'fabrica',
-      label: 'Fábrica de pintura',
-      desc: 'Producción, fórmulas, recetas y lotes',
-      icon: Factory,
-      off: [],
-      tone: 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100'
-    }
+    { id: 'ferreteria', label: 'Ferretería', desc: 'Sin producción ni recetas de color', icon: Hammer, tone: 'bg-orange-50 border-orange-200 text-orange-900 hover:bg-orange-100' },
+    { id: 'pintureria', label: 'Pinturería (venta + tintométrico)', desc: 'Recetas de color sí, planta industrial no', icon: PaintBucket, tone: 'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-900 hover:bg-fuchsia-100' },
+    { id: 'fabrica', label: 'Fábrica de pintura', desc: 'Producción, fórmulas, recetas y lotes', icon: Factory, tone: 'bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100' }
   ];
 
-  const currentProfileId = BUSINESS_PROFILES.find(p =>
-    ALL_MODULES_METADATA.filter(m => !OPT_IN_MODULES.includes(m.key)).every(m => isModuleActive(m.key) === !p.off.includes(m.key))
-  )?.id;
+  const detectedProfile: BusinessProfileId = isModuleActive('production') ? 'fabrica' : isModuleActive('color_recipes') ? 'pintureria' : 'ferreteria';
+  const currentProfileId: BusinessProfileId = subscription?.profile || detectedProfile;
+  const currentPlanId = subscription?.plan;
+  const currentPlan = PLANS.find(p => p.id === currentPlanId);
+  const usersUsed = countBillableUsers(users);
 
-  const handleApplyProfile = async (profileId: string) => {
+  // Aplica plan + perfil: prende lo que incluye y apaga el resto (los agregados como la tienda no se tocan)
+  const applyPlanAndProfile = async (plan: SubscriptionPlanId | undefined, profile: BusinessProfileId) => {
+    const updates: Partial<Record<ModuleKey, boolean>> = {};
+    const allowed = plan ? modulesFor(plan, profile) : null;
+    ALL_MODULES_METADATA.forEach(m => {
+      if (OPT_IN_MODULES.includes(m.key)) return;
+      if (allowed) updates[m.key] = allowed.has(m.key);
+      else if (m.key === 'production' || m.key === 'color_recipes') updates[m.key] = modulesFor('full', profile).has(m.key);
+    });
+    await onBatchToggleModules(updates);
+    if (plan && onSaveSubscription) await onSaveSubscription({ plan, profile, updatedAt: new Date().toISOString() });
+    else if (subscription && onSaveSubscription) await onSaveSubscription({ ...subscription, profile, updatedAt: new Date().toISOString() });
+  };
+
+  const handleApplyProfile = async (profileId: BusinessProfileId) => {
     const profile = BUSINESS_PROFILES.find(p => p.id === profileId);
     if (!profile) return;
-    if (!window.confirm(`¿Aplicar el perfil "${profile.label}"? Se activan todos los módulos excepto: ${profile.off.length ? profile.off.map(k => ALL_MODULES_METADATA.find(m => m.key === k)?.label).join(', ') : 'ninguno'}.`)) {
-      return;
-    }
+    if (!window.confirm(`¿Aplicar el perfil "${profile.label}"?${currentPlan ? ` Se mantiene el plan ${currentPlan.label}.` : ''}`)) return;
     setIsUpdating(true);
     try {
-      const updates: Partial<Record<ModuleKey, boolean>> = {};
-      ALL_MODULES_METADATA.forEach(m => {
-        if (OPT_IN_MODULES.includes(m.key)) return; // los agregados de suscripción se activan aparte
-        updates[m.key] = !profile.off.includes(m.key);
-      });
-      await onBatchToggleModules(updates);
+      await applyPlanAndProfile(currentPlanId, profileId);
       showToast(`Perfil "${profile.label}" aplicado.`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleApplyPlan = async (planId: SubscriptionPlanId) => {
+    const plan = PLANS.find(p => p.id === planId);
+    if (!plan) return;
+    if (!window.confirm(`¿Pasar al plan ${plan.label}? Se prenden los módulos del plan y se apagan los demás. La tienda online no cambia (es un agregado aparte).`)) return;
+    setIsUpdating(true);
+    try {
+      await applyPlanAndProfile(planId, currentProfileId);
+      showToast(`Plan ${plan.label} aplicado.`);
     } finally {
       setIsUpdating(false);
     }
@@ -579,6 +586,40 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
             <button onClick={() => setToastMessage(null)} className="text-indigo-200 hover:text-white">✕</button>
           </div>
         )}
+
+        {/* Plan de suscripción */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">Plan contratado</div>
+            <div className="text-[11px] font-bold text-slate-600">
+              Usuarios: {usersUsed}{currentPlan ? ` de ${currentPlan.maxUsers ?? 'sin límite'}` : ''}
+              {currentPlan?.maxUsers != null && usersUsed > currentPlan.maxUsers && <span className="ml-1 text-rose-600">· supera el plan</span>}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {PLANS.map(p => {
+              const active = currentPlanId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={isUpdating || !onSaveSubscription}
+                  onClick={() => handleApplyPlan(p.id)}
+                  className={`text-left p-3 rounded-2xl border bg-white hover:border-indigo-400 transition-colors disabled:opacity-50 ${active ? 'border-indigo-500 ring-2 ring-indigo-500' : 'border-slate-200'}`}
+                >
+                  <div className="flex items-center gap-2 font-extrabold text-sm text-slate-900">
+                    {p.label}
+                    <span className="text-xs font-bold text-slate-500">${p.price.toLocaleString('es-AR')}/mes</span>
+                    {active && <span className="ml-auto text-[10px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full">ACTUAL</span>}
+                  </div>
+                  <div className="text-[11px] mt-0.5 text-slate-600">{p.desc}</div>
+                  <div className="text-[11px] mt-1 font-bold text-slate-500">{p.maxUsers ? `Hasta ${p.maxUsers} usuarios` : 'Usuarios sin límite'}</div>
+                </button>
+              );
+            })}
+          </div>
+          {!currentPlanId && <p className="text-[11px] text-amber-700 mt-2">Este cliente todavía no tiene un plan asignado: elegí uno para dejar prendidos solo los módulos que paga.</p>}
+        </div>
 
         {/* Perfiles de negocio */}
         <div className="p-4 border-b border-slate-200 bg-white">

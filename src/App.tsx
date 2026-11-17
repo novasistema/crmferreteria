@@ -10,6 +10,7 @@ import {
 // Guardado que no se bloquea sin internet (los cambios se sincronizan al volver la conexión)
 import { setDoc, deleteDoc, updateDoc, writeBatch, startConnectionMonitor, isOffline } from './services/offlineSync';
 import { ConnectionStatus } from './components/ConnectionStatus';
+import { planById } from './utils/plans';
 import { isModuleOn } from './utils/modules';
 import { 
   db, 
@@ -3279,6 +3280,8 @@ export default function App() {
             <UsersModule
               users={appUsers}
               currentUser={currentUser}
+              maxUsers={planById(companyConfig?.subscription?.plan)?.maxUsers ?? null}
+              planLabel={planById(companyConfig?.subscription?.plan)?.label}
               onSaveUser={async (user) => {
                 await setDoc(doc(db, 'app_users', user.id), user);
               }}
@@ -3327,6 +3330,13 @@ export default function App() {
         onChangePassword={() => setCreatorLockMode('change')}
         onOpenArcaSetup={() => setIsArcaSetupOpen(true)}
         arcaReady={isArcaReady(companyConfig)}
+        subscription={companyConfig?.subscription}
+        users={appUsers}
+        onSaveSubscription={async sub => {
+          if (!canEditModules()) return;
+          setCompanyConfig(prev => (prev ? { ...prev, subscription: sub } : prev));
+          await setDoc(doc(db, 'company_config', 'main_config'), { subscription: sub }, { merge: true });
+        }}
         systemModuleToggles={companyConfig?.systemModuleToggles}
         onToggleModule={handleToggleSystemModule}
         onBatchToggleModules={handleBatchToggleSystemModules}

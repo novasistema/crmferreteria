@@ -509,6 +509,7 @@ export interface CompanyConfig {
   notificationWhatsappTemplate: string;
   paymentReminderTemplate: string;
   systemModuleToggles?: Partial<Record<ModuleKey, boolean>>; // Control Maestro de Módulos del Creador
+  subscription?: SubscriptionInfo; // Plan contratado por el cliente (Básico, Medio o Full)
   creatorPanelPasswordHash?: string; // SHA-256 de la contraseña del Control Maestro
   creatorPanelPasswordSalt?: string;
   // --- Facturación electrónica ARCA (configura el creador) ---
@@ -1183,6 +1184,14 @@ export interface SalaryPayment {
   items: SalaryPaymentItem[];
   notes?: string;
   createdAt: string;
+}
+
+export type SubscriptionPlanId = 'basico' | 'medio' | 'full';
+export type BusinessProfileId = 'ferreteria' | 'pintureria' | 'fabrica';
+export interface SubscriptionInfo {
+  plan: SubscriptionPlanId;
+  profile: BusinessProfileId;
+  updatedAt: string;
 }
 
 export type UserRole = 'creador' | 'admin' | 'produccion' | 'ventas' | 'vendedor_calle' | 'logistica' | 'finanzas';

@@ -19,19 +19,24 @@ import {
   Compass
 } from 'lucide-react';
 import { AppUser, UserRole } from '../types';
+import { countBillableUsers } from '../utils/plans';
 
 interface UsersModuleProps {
   users: AppUser[];
   currentUser: AppUser | null;
   onSaveUser: (user: AppUser) => Promise<void>;
   onDeleteUser: (userId: string) => Promise<void>;
+  maxUsers?: number | null; // límite del plan contratado (null = sin límite)
+  planLabel?: string;
 }
 
 export const UsersModule: React.FC<UsersModuleProps> = ({
   users,
   currentUser,
   onSaveUser,
-  onDeleteUser
+  onDeleteUser,
+  maxUsers = null,
+  planLabel
 }) => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -79,6 +84,18 @@ export const UsersModule: React.FC<UsersModuleProps> = ({
     if (!form.password || form.password.length < 4) {
       alert('Asigná una contraseña de al menos 4 caracteres para este usuario.');
       return;
+    }
+
+    // Límite de usuarios del plan: cuentan los activos, sin el creador
+    const willCount = form.role !== 'creador' && (form.active ?? true);
+    const wasCounted = !!form.id && users.some(u => u.id === form.id && u.role !== 'creador' && u.active !== false);
+    if (maxUsers != null && willCount && !wasCounted && countBillableUsers(users) >= maxUsers) {
+      const msg = `El plan ${planLabel || 'contratado'} permite hasta ${maxUsers} usuarios activos y ya están todos en uso.`;
+      if (currentUser?.role !== 'creador') {
+        alert(`${msg} Para sumar otro, desactivá un usuario o pasá a un plan superior.`);
+        return;
+      }
+      if (!window.confirm(`${msg} Sos el creador: ¿crearlo igual?`)) return;
     }
 
     const userToSave: AppUser = {
@@ -154,6 +171,11 @@ export const UsersModule: React.FC<UsersModuleProps> = ({
           >
             <Plus className="w-4 h-4" /> Nuevo Usuario
           </button>
+          {maxUsers != null && (
+            <span className="text-[11px] font-bold text-slate-500">
+              {countBillableUsers(users)} de {maxUsers} usuarios activos · plan {planLabel}
+            </span>
+          )}
         </div>
 
         {/* Filters */}
