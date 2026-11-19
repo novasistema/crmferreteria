@@ -6,7 +6,14 @@ export interface ArcaApiResponse {
   [key: string]: any;
 }
 
+// En una sesión de demostración no se llama a ARCA de verdad
+let demoSession = false;
+export const setArcaDemoSession = (on: boolean) => { demoSession = on; };
+
 export const callArca = async (action: string, payload: Record<string, unknown> = {}): Promise<ArcaApiResponse> => {
+  if (demoSession && action !== 'status') {
+    return { ok: false, code: 'demo', error: 'En la demo no se emiten comprobantes reales en ARCA. En tu sistema, con tu certificado, la factura sale con CAE.' };
+  }
   let res: Response;
   try {
     res = await fetch('/api/arca', {

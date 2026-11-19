@@ -25,6 +25,7 @@ interface LoginScreenProps {
   onOpenCustomerPortal: () => void;
   onOpenMobileSellerApp?: () => void;
   config?: CompanyConfig | null;
+  demoEnabled?: boolean; // muestra el acceso DEMO / DEMO
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -32,8 +33,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLogin,
   onOpenCustomerPortal,
   onOpenMobileSellerApp,
-  config
+  config,
+  demoEnabled = false
 }) => {
+  const demoUser = demoEnabled ? users.find(u => u.isDemo && u.active) : undefined;
+  const visibleUsers = users.filter(u => !u.isDemo);
   const [emailOrUser, setEmailOrUser] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -58,11 +62,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
 
     // Find user by email or name
-    const found = users.find(u => 
-      u.email.toLowerCase() === term || 
-      u.name.toLowerCase().includes(term) ||
-      u.role.toLowerCase() === term
-    );
+    // Primero la coincidencia exacta (email o nombre); después por parte del nombre o el rol
+    const candidates = users.filter(u => !u.isDemo || demoEnabled);
+    const found =
+      candidates.find(u => u.email.toLowerCase() === term || u.name.toLowerCase() === term) ||
+      candidates.find(u => !u.isDemo && (u.name.toLowerCase().includes(term) || u.role.toLowerCase() === term));
 
     if (!found) {
       setError('Usuario o email no registrado en el sistema de la fábrica.');
@@ -79,7 +83,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setError('Este usuario no tiene contraseña asignada. Pedile al administrador que le asigne una desde Usuarios.');
       return;
     }
-    if (password !== found.password) {
+    const passwordOk = found.isDemo ? password.trim().toUpperCase() === found.password.toUpperCase() : password === found.password;
+    if (!passwordOk) {
       setError('Contraseña incorrecta.');
       setPassword('');
       return;
@@ -249,6 +254,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </button>
           </form>
 
+          {/* Acceso de demostración */}
+          {demoUser && (
+            <div className="mt-5 p-4 rounded-2xl bg-sky-50 border border-sky-200">
+              <div className="text-sm font-black text-sky-950">¿Querés ver el sistema funcionando?</div>
+              <div className="text-xs text-sky-900 mt-1">
+                Entrá con el usuario <strong className="font-mono">DEMO</strong> y la contraseña <strong className="font-mono">DEMO</strong>. Los datos son de prueba.
+              </div>
+              <button
+                type="button"
+                onClick={() => onLogin(demoUser)}
+                className="mt-3 w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold transition-colors"
+              >
+                Entrar a la demo
+              </button>
+            </div>
+          )}
+
           {/* Creator Master Quick Login Card */}
           {(() => {
             const creator = users.find(u => u.role === 'creador' || u.id === 'user-creador');
@@ -296,12 +318,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 Elegí tu usuario y escribí tu contraseña
               </span>
               <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full">
-                {users.length} Registrados
+                {visibleUsers.length} Registrados
               </span>
             </div>
 
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-              {users.map(u => {
+              {visibleUsers.map(u => {
                 const isSelected = emailOrUser === u.email;
                 const isCreator = u.role === 'creador';
                 return (

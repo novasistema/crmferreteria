@@ -48,5 +48,5 @@ export const modulesFor = (plan: SubscriptionPlanId, profile: BusinessProfileId)
   new Set<ModuleKey>([...(planById(plan)?.modules || []), ...PROFILE_MODULES[profile]]);
 
 // Usuarios que cuentan para el límite del plan: los activos, sin contar al creador
-export const countBillableUsers = (users: { role: string; active: boolean }[]) =>
-  users.filter(u => u.role !== 'creador' && u.active !== false).length;
+export const countBillableUsers = (users: { role: string; active: boolean; isDemo?: boolean }[]) =>
+  users.filter(u => u.role !== 'creador' && !u.isDemo && u.active !== false).length;

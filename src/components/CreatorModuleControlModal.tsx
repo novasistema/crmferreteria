@@ -56,7 +56,9 @@ interface CreatorModuleControlModalProps {
   arcaReady?: boolean;
   subscription?: SubscriptionInfo;
   onSaveSubscription?: (sub: SubscriptionInfo) => Promise<void>;
-  users?: { role: string; active: boolean }[];
+  users?: { role: string; active: boolean; isDemo?: boolean }[];
+  demoAccessEnabled?: boolean;
+  onToggleDemoAccess?: (enabled: boolean) => Promise<void>;
 }
 
 interface ModuleMeta {
@@ -326,7 +328,9 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
   arcaReady,
   subscription,
   onSaveSubscription,
-  users = []
+  users = [],
+  demoAccessEnabled = false,
+  onToggleDemoAccess
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -619,6 +623,35 @@ export const CreatorModuleControlModal: React.FC<CreatorModuleControlModalProps>
             })}
           </div>
           {!currentPlanId && <p className="text-[11px] text-amber-700 mt-2">Este cliente todavía no tiene un plan asignado: elegí uno para dejar prendidos solo los módulos que paga.</p>}
+          {onToggleDemoAccess && (
+            <div className="mt-3 p-3 rounded-2xl border border-sky-200 bg-sky-50 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-extrabold text-sky-950">Acceso de demostración</div>
+                <div className="text-[11px] text-sky-900">
+                  Usuario DEMO, contraseña DEMO, con un botón "Entrar a la demo" en el ingreso. No entra a Usuarios ni Configuración y no factura en ARCA. Dejalo apagado en el sistema de cada cliente.
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={demoAccessEnabled}
+                aria-label="Acceso de demostración"
+                disabled={isUpdating}
+                onClick={async () => {
+                  setIsUpdating(true);
+                  try {
+                    await onToggleDemoAccess(!demoAccessEnabled);
+                    showToast(!demoAccessEnabled ? 'Acceso DEMO activado.' : 'Acceso DEMO desactivado.');
+                  } finally {
+                    setIsUpdating(false);
+                  }
+                }}
+                className={`shrink-0 px-4 py-2 rounded-xl text-xs font-black transition-colors disabled:opacity-50 ${demoAccessEnabled ? 'bg-sky-600 text-white hover:bg-sky-700' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+              >
+                {demoAccessEnabled ? 'Activado' : 'Activar'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Perfiles de negocio */}

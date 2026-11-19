@@ -766,6 +766,20 @@ export const INITIAL_FACTORY_USERS: AppUser[] = [
   }
 ];
 
+// Usuario de demostración: solo existe y entra cuando el creador activa el acceso de demo en el Control Maestro
+export const DEMO_USER: AppUser = {
+  id: 'user-demo',
+  name: 'DEMO',
+  email: 'demo',
+  role: 'admin',
+  roleLabel: 'Usuario de demostración',
+  password: 'DEMO',
+  avatarColor: '#0ea5e9',
+  active: true,
+  isDemo: true,
+  createdAt: '2026-11-19T00:00:00.000Z'
+};
+
 export async function seedUsersIfEmpty(): Promise<AppUser[]> {
   try {
     const userSnap = await getDocs(collection(db, 'app_users'));

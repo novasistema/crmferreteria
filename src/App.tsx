@@ -20,6 +20,7 @@ import {
   OperationType,
   syncOfficialAugust2026PriceList,
   INITIAL_FACTORY_USERS,
+  DEMO_USER,
   seedUsersIfEmpty,
   seedFinanceAndStaffIfEmpty,
   seedSellersIfEmpty,
@@ -119,7 +120,7 @@ import { SystemAssistantModule } from './components/SystemAssistantModule';
 import { CreatorModuleControlModal } from './components/CreatorModuleControlModal';
 import { CreatorPanelLock, CreatorLockMode, hashCreatorPassword, generateSalt } from './components/CreatorPanelLock';
 import { ArcaSetupWizard } from './components/ArcaSetupWizard';
-import { callArca } from './services/arcaClient';
+import { callArca, setArcaDemoSession } from './services/arcaClient';
 import { TabsBar, TabItem } from './components/TabsBar';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { exportPriceListToExcel } from './utils/exportUtils';
@@ -2232,6 +2233,28 @@ export default function App() {
     localStorage.removeItem('colorear_current_user');
   };
 
+  // --- ACCESO DE DEMOSTRACIÓN (usuario DEMO / DEMO) ---
+  const demoAccessEnabled = companyConfig?.demoAccessEnabled === true;
+  setArcaDemoSession(!!currentUser?.isDemo);
+  useEffect(() => {
+    // Con la demo activada, el usuario DEMO tiene que existir y estar activo
+    if (!demoAccessEnabled) return;
+    const existing = appUsers.find(u => u.id === DEMO_USER.id);
+    if (!existing || !existing.active || existing.password !== DEMO_USER.password || !existing.isDemo) {
+      setDoc(doc(db, 'app_users', DEMO_USER.id), { ...DEMO_USER, createdAt: existing?.createdAt || new Date().toISOString() }).catch(e => console.error('No se pudo crear el usuario DEMO:', e));
+    }
+  }, [demoAccessEnabled, appUsers]);
+  useEffect(() => {
+    // Si el creador apaga la demo, se cierran las sesiones DEMO abiertas
+    if (currentUser?.isDemo && companyConfig && !demoAccessEnabled) handleLogout();
+  }, [currentUser?.isDemo, demoAccessEnabled, companyConfig]);
+  const handleToggleDemoAccess = async (enabled: boolean) => {
+    if (!canEditModules()) return;
+    setCompanyConfig(prev => (prev ? { ...prev, demoAccessEnabled: enabled } : prev));
+    await setDoc(doc(db, 'company_config', 'main_config'), { demoAccessEnabled: enabled }, { merge: true });
+    if (!enabled) await setDoc(doc(db, 'app_users', DEMO_USER.id), { active: false }, { merge: true });
+  };
+
   const handleToggleSystemModule = async (moduleKey: ModuleKey, enabled: boolean) => {
     if (!canEditModules()) return;
     try {
@@ -2405,6 +2428,7 @@ export default function App() {
         onOpenCustomerPortal={() => setActiveModule('customer_portal')}
         onOpenMobileSellerApp={() => setIsMobileSellerAppOpen(true)}
         config={companyConfig}
+        demoEnabled={demoAccessEnabled}
       />
       </>
     );
@@ -2449,7 +2473,14 @@ export default function App() {
         {/* Content View */}
         <main className="flex-1 h-full overflow-y-auto bg-slate-100 relative">
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-            {currentUser?.role !== 'creador' && !isModuleOn(companyConfig?.systemModuleToggles, activeModule) ? (
+            {currentUser?.isDemo && (activeModule === 'users' || activeModule === 'settings') ? (
+              <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 text-center shadow-xl max-w-md mx-auto my-16">
+                <h3 className="text-xl font-black text-slate-900 mb-2">No disponible en la demo</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Usuarios y Configuración quedan cerrados en la demostración. En tu sistema los maneja el administrador.
+                </p>
+              </div>
+            ) : currentUser?.role !== 'creador' && !isModuleOn(companyConfig?.systemModuleToggles, activeModule) ? (
               <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 text-center shadow-xl max-w-md mx-auto my-16 animate-in fade-in">
                 <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto mb-4 text-3xl shadow-xs">
                   ⚠️
@@ -3346,6 +3377,8 @@ export default function App() {
         onChangePassword={() => setCreatorLockMode('change')}
         onOpenArcaSetup={() => setIsArcaSetupOpen(true)}
         arcaReady={isArcaReady(companyConfig)}
+        demoAccessEnabled={demoAccessEnabled}
+        onToggleDemoAccess={handleToggleDemoAccess}
         subscription={companyConfig?.subscription}
         users={appUsers}
         onSaveSubscription={async sub => {

@@ -510,6 +510,7 @@ export interface CompanyConfig {
   paymentReminderTemplate: string;
   systemModuleToggles?: Partial<Record<ModuleKey, boolean>>; // Control Maestro de Módulos del Creador
   subscription?: SubscriptionInfo; // Plan contratado por el cliente (Básico, Medio o Full)
+  demoAccessEnabled?: boolean; // Habilita el usuario DEMO / DEMO en la pantalla de ingreso
   creatorPanelPasswordHash?: string; // SHA-256 de la contraseña del Control Maestro
   creatorPanelPasswordSalt?: string;
   // --- Facturación electrónica ARCA (configura el creador) ---
@@ -1208,6 +1209,7 @@ export interface AppUser {
   phone?: string;
   sellerId?: string; // Si está vinculado a un vendedor de calle
   allowedModules?: ModuleKey[]; // Módulos permitidos asignados desde administración
+  isDemo?: boolean; // Usuario de demostración: no entra a Usuarios ni Configuración, ni emite en ARCA
   lastLogin?: string;
   createdAt: string;
 }
