@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { Customer, Supplier, PurchaseOrder, SalesOrder, CompanyConfig, Cashbox } from '../types';
+import { legalName, transferInfo } from '../utils/brand';
 
 interface DebtsAndReceivablesModuleProps {
   customers: Customer[];
@@ -106,33 +107,39 @@ export const DebtsAndReceivablesModule: React.FC<DebtsAndReceivablesModuleProps>
     );
   }, [pendingSuppliersData, searchQuery]);
 
+  // Datos bancarios que cargó el comercio (Tienda Online → transferencia); si no hay, no se mandan
+  const bankLines = (kind: 'wa' | 'mail') => {
+    const t = transferInfo(config);
+    const rows = [
+      t.bank && (kind === 'wa' ? `🏦 *Banco:* ${t.bank}` : `- Banco: ${t.bank}`),
+      t.cbu && (kind === 'wa' ? `📄 *CBU:* ${t.cbu}` : `- CBU: ${t.cbu}`),
+      t.alias && (kind === 'wa' ? `🏷️ *Alias:* ${t.alias}` : `- Alias: ${t.alias}`),
+      config?.cuit && (kind === 'wa' ? `🏢 *CUIT:* ${config.cuit}` : `- CUIT: ${config.cuit}`)
+    ].filter(Boolean);
+    if (!rows.length) return '';
+    return (kind === 'wa' ? ' Datos para transferir:\n' : 'Datos de cuenta para realizar la transferencia:\n') + rows.join('\n');
+  };
+
   // Generate WhatsApp Message for Debtor Customer
   const buildCustomerWhatsApp = (c: Customer) => {
-    const company = config?.companyName || 'Colorear Pinturas S.R.L.';
+    const company = legalName(config);
     return (
       `Estimado/a *${c.businessName}*,\n\n` +
       `Nos comunicamos desde el área de Administración y Cuentas Corrientes de *${company}* para informarle que registra un saldo pendiente de *$ ${c.currentBalance.toLocaleString('es-AR')}*.\n\n` +
-      `Agradecemos coordinar la cancelación correspondiente. Datos bancarios oficiales de fábrica:\n` +
-      `🏦 *Banco:* Banco Galicia\n` +
-      `📄 *CBU:* 0720045620000012345678\n` +
-      `🏷️ *Alias:* COLOREAR.PINTURAS\n` +
-      `🏢 *CUIT:* ${config?.cuit || '30-71489234-8'}\n\n` +
+      `Agradecemos coordinar la cancelación correspondiente.${bankLines('wa')}\n\n` +
       `Una vez realizada la transferencia, rogamos enviar el comprobante por este medio para emitir el correspondiente recibo de cobranza. ¡Muchas gracias!`
     );
   };
 
   // Generate Email URL for Debtor Customer
   const buildCustomerMailto = (c: Customer) => {
-    const subject = encodeURIComponent(`Estado de Cuenta y Saldo Pendiente - Colorear Pinturas S.R.L. (${c.businessName})`);
+    const subject = encodeURIComponent(`Estado de Cuenta y Saldo Pendiente - ${legalName(config)} (${c.businessName})`);
     const body = encodeURIComponent(
       `Estimado/a ${c.businessName},\n\n` +
-      `Le informamos desde el área de Administración de Colorear Pinturas S.R.L. que a la fecha registra un saldo pendiente en su cuenta corriente de $ ${c.currentBalance.toLocaleString('es-AR')}.\n\n` +
-      `Datos de cuenta para realizar la transferencia:\n` +
-      `- CBU: 0720045620000012345678\n` +
-      `- Alias: COLOREAR.PINTURAS\n` +
-      `- CUIT: ${config?.cuit || '30-71489234-8'}\n\n` +
+      `Le informamos desde el área de Administración de ${legalName(config)} que a la fecha registra un saldo pendiente en su cuenta corriente de $ ${c.currentBalance.toLocaleString('es-AR')}.\n\n` +
+      `${bankLines('mail')}\n\n` +
       `Agradecemos enviar el comprobante de pago a este correo para imputar en su cuenta.\n\n` +
-      `Atentamente,\nAdministración - Colorear Pinturas S.R.L.`
+      `Atentamente,\nAdministración - ${legalName(config)}`
     );
     return `mailto:${c.email}?subject=${subject}&body=${body}`;
   };
@@ -141,19 +148,19 @@ export const DebtsAndReceivablesModule: React.FC<DebtsAndReceivablesModuleProps>
   const buildSupplierWhatsApp = (s: Supplier, amount: number) => {
     return (
       `Hola *${s.businessName}*,\n\n` +
-      `Nos comunicamos desde Tesorería de *Colorear Pinturas S.R.L.* respecto a la factura pendiente por *$ ${amount.toLocaleString('es-AR')}* para coordinar la fecha de emisión del pago / transferencia bancaria.\n\n` +
+      `Nos comunicamos desde Tesorería de *${legalName(config)}* respecto a la factura pendiente por *$ ${amount.toLocaleString('es-AR')}* para coordinar la fecha de emisión del pago / transferencia bancaria.\n\n` +
       `Por favor indíquenos si disponen de cuenta CBU actualizada. Muchas gracias.`
     );
   };
 
   // Generate Email URL for Supplier
   const buildSupplierMailto = (s: Supplier, amount: number) => {
-    const subject = encodeURIComponent(`Coordinación de Pago a Proveedor - Colorear Pinturas S.R.L.`);
+    const subject = encodeURIComponent(`Coordinación de Pago a Proveedor - ${legalName(config)}`);
     const body = encodeURIComponent(
       `Estimados ${s.businessName},\n\n` +
-      `Nos contactamos desde Tesorería de Colorear Pinturas S.R.L. con respecto al saldo pendiente de $ ${amount.toLocaleString('es-AR')}.\n` +
+      `Nos contactamos desde Tesorería de ${legalName(config)} con respecto al saldo pendiente de $ ${amount.toLocaleString('es-AR')}.\n` +
       `Agradecemos confirmarnos su CBU/Alias bancario para proceder con la orden de pago correspondiente.\n\n` +
-      `Saludos cordiales,\nTesorería - Colorear Pinturas S.R.L.`
+      `Saludos cordiales,\nTesorería - ${legalName(config)}`
     );
     return `mailto:${s.email}?subject=${subject}&body=${body}`;
   };

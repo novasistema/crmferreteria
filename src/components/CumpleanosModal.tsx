@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Cake, X, MessageSquare, Send, Calendar, Gift, Search, CheckCircle2, BadgePercent } from 'lucide-react';
 import { Customer } from '../types';
+import { brandName } from '../utils/brand';
 
 interface CumpleanosModalProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export const CumpleanosModal: React.FC<CumpleanosModalProps> = ({
   const handleSendWhatsAppPromo = (cust: typeof birthdayCustomers[0]) => {
     const couponCode = `CUMPLE-${cust.taxId.slice(-4)}-${promoDiscount}`;
     const text = encodeURIComponent(
-      `¡Hola ${cust.businessName}! 🎉 Desde Nova Systems / Colorear Pinturas queremos desearte un muy Feliz Cumpleaños. ` +
+      `¡Hola ${cust.businessName}! 🎉 Desde ${brandName()} queremos desearte un muy Feliz Cumpleaños. ` +
       `Para celebrarlo, te regalamos un cupón especial de *${promoDiscount}% de descuento* (${couponCode}) válido para tu próxima compra en fábrica y mostrador. ¡Que tengas un excelente día!`
     );
     const phone = cust.phone?.replace(/[^0-9]/g, '') || '5491100000000';

@@ -388,7 +388,7 @@ export const ArcaFiscalModule: React.FC<ArcaFiscalModuleProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Certificado Digital X.509:</span>
-                <span className="text-white font-mono">COLOREAR_2026.crt</span>
+                <span className="text-white font-mono">certificado_arca.crt</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Punto de Venta Homologado:</span>

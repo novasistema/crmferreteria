@@ -47,6 +47,7 @@ import {
   VisitStatus,
   PriceListType
 } from '../types';
+import { brandName, brandLogo } from '../utils/brand';
 
 interface MobileSellerAppProps {
   sellers: Seller[];
@@ -549,7 +550,7 @@ export const MobileSellerApp: React.FC<MobileSellerAppProps> = ({
         
         {/* TOP STATUS & APP BAR */}
         <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-          {/* Colorear Spectrum Bar */}
+          {/* Barra de colores */}
           <div className="h-1.5 w-full flex">
             <div className="flex-1 bg-[#4b0082]"></div>
             <div className="flex-1 bg-[#003399]"></div>
@@ -563,8 +564,8 @@ export const MobileSellerApp: React.FC<MobileSellerAppProps> = ({
           <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <img 
-                src="/assets/aistudio/colorear-500px_0158e3cb.webp" 
-                alt="Colorear Pinturas" 
+                src={brandLogo()} 
+                alt={brandName()} 
                 className="h-7 w-auto object-contain"
               />
               <div className="leading-tight">
@@ -835,7 +836,7 @@ export const MobileSellerApp: React.FC<MobileSellerAppProps> = ({
 
                           {/* WhatsApp */}
                           <a
-                            href={`https://wa.me/${(stop.customerPhone || cust?.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${stop.customerName}, soy ${currentSeller?.name || 'el preventista'} de Colorear Pinturas. Estoy en camino para visitarte.`)}`}
+                            href={`https://wa.me/${(stop.customerPhone || cust?.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${stop.customerName}, soy ${currentSeller?.name || 'el preventista'} de ${brandName()}. Estoy en camino para visitarte.`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex flex-col items-center justify-center p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors"
@@ -1791,7 +1792,7 @@ export const MobileSellerApp: React.FC<MobileSellerAppProps> = ({
 
               {/* Share via WhatsApp */}
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(`*COLOREAR PINTURAS - PEDIDO CONFIRMADO*\n\nPedido: ${orderSuccessModal.orderNumber}\nCliente: ${orderSuccessModal.customerName}\nTotal: ${formatMoney(orderSuccessModal.total)}\n\nTomado por: ${orderSuccessModal.sellerName || 'Preventista'}`)}`}
+                href={`https://wa.me/?text=${encodeURIComponent(`*${brandName().toUpperCase()} - PEDIDO CONFIRMADO*\n\nPedido: ${orderSuccessModal.orderNumber}\nCliente: ${orderSuccessModal.customerName}\nTotal: ${formatMoney(orderSuccessModal.total)}\n\nTomado por: ${orderSuccessModal.sellerName || 'Preventista'}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs"

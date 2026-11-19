@@ -28,6 +28,7 @@ import {
   Employee,
   SalaryPayment
 } from '../types';
+import { legalName } from '../utils/brand';
 
 export type BackupFrequency = '12_hours' | '24_hours' | '3_days' | '7_days' | 'manual';
 
@@ -176,12 +177,12 @@ export async function createFullBackupSnapshot(companyConfig?: CompanyConfig | n
   }
 
   const meta: BackupMetadata = {
-    app: 'Colorear Pinturas S.R.L. - Sistema de Gestión',
+    app: 'Sistema de Gestión',
     version: 'Agosto 2026',
     exportedAt: new Date().toISOString(),
     totalRecords,
     collectionCounts,
-    companyName: companyConfig?.companyName || 'Colorear Pinturas S.R.L.',
+    companyName: legalName(companyConfig),
     cuit: companyConfig?.cuit || '30-71489234-8'
   };
 
@@ -204,7 +205,7 @@ export function downloadBackupPackage(pkg: BackupPackage): string {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10);
   const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-  const fileName = `backup_colorear_pinturas_${dateStr}_${timeStr}.json`;
+  const fileName = `backup_sistema_${dateStr}_${timeStr}.json`;
 
   const link = document.createElement('a');
   link.href = url;

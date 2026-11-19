@@ -22,6 +22,7 @@ import {
   Supplier, 
   Customer 
 } from '../types';
+import { brandName } from '../utils/brand';
 
 interface SystemAssistantModuleProps {
   rawMaterials: RawMaterial[];
@@ -48,7 +49,7 @@ export const SystemAssistantModule: React.FC<SystemAssistantModuleProps> = ({
   const [messages, setMessages] = useState<Array<{ sender: 'user' | 'assistant'; text: string; time: string }>>([
     {
       sender: 'assistant',
-      text: '¡Hola! Soy el Asistente Industrial Inteligente de Colorear Pinturas. Puedo ayudarte a analizar quiebres de materias primas químicas (resinas, dióxido de titanio, carbonatos), calcular costos teóricos de producción por balde o lata, y redactar sugerencias de compras de insumos para abastecer las órdenes de planta.',
+      text: '¡Hola! Soy el Asistente Inteligente de ' + brandName() + '. Puedo ayudarte a analizar quiebres de materias primas químicas (resinas, dióxido de titanio, carbonatos), calcular costos teóricos de producción por balde o lata, y redactar sugerencias de compras de insumos para abastecer las órdenes de planta.',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -147,7 +148,7 @@ export const SystemAssistantModule: React.FC<SystemAssistantModuleProps> = ({
       } else if (q.includes('lote') || q.includes('partida') || q.includes('produccion')) {
         response = `🏭 **PRODUCCIÓN EN FÁBRICA:**\nActualmente hay ${productionOrders.length} órdenes registradas. Las fórmulas estándar rinden 100 kg base y calculan consumo automático de resina acrílica, carbonatos y pigmento blanco R-902.`;
       } else {
-        response = `He procesado tu consulta sobre "${query}". En base a los datos en tiempo real de Colorear Pinturas, el sistema mantiene trazabilidad total de lotes, recetas de fabricación y saldos fiscales ARCA autorizados.`;
+        response = `He procesado tu consulta sobre "${query}". En base a los datos en tiempo real de ${brandName()}, el sistema mantiene trazabilidad total de lotes, recetas de fabricación y saldos fiscales ARCA autorizados.`;
       }
 
       setMessages(prev => [

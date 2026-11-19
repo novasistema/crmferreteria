@@ -28,6 +28,7 @@ import {
 import { PurchaseOrder, PurchaseOrderItem, Product, Supplier, CompanyConfig } from '../types';
 import { generatePurchaseOrderPDF, buildPurchaseOrderWhatsAppMessage } from '../utils/purchaseOrderPdfUtils';
 import * as XLSX from 'xlsx';
+import { brandName } from '../utils/brand';
 
 interface SupplierOrdersModuleProps {
   purchaseOrders: PurchaseOrder[];
@@ -325,7 +326,7 @@ export const SupplierOrdersModule: React.FC<SupplierOrdersModuleProps> = ({
     }
     const message = buildPurchaseOrderWhatsAppMessage(
       order, 
-      config?.tradeName || config?.companyName || 'Colorear Pinturas'
+      brandName(config)
     );
     return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
   };
@@ -334,7 +335,7 @@ export const SupplierOrdersModule: React.FC<SupplierOrdersModuleProps> = ({
   const handleCopyWhatsAppMessage = (order: PurchaseOrder) => {
     const text = buildPurchaseOrderWhatsAppMessage(
       order, 
-      config?.tradeName || config?.companyName || 'Colorear Pinturas'
+      brandName(config)
     );
     navigator.clipboard.writeText(text);
     setIsCopied(true);
@@ -1272,7 +1273,7 @@ export const SupplierOrdersModule: React.FC<SupplierOrdersModuleProps> = ({
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-800 max-h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                 {buildPurchaseOrderWhatsAppMessage(
                   whatsAppModalOrder,
-                  config?.tradeName || config?.companyName || 'Colorear Pinturas'
+                  brandName(config)
                 )}
               </div>
             </div>

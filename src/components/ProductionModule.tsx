@@ -43,6 +43,7 @@ import {
   UnitType,
   FormulaItem
 } from '../types';
+import { brandName, legalName, brandLogo } from '../utils/brand';
 
 interface ProductionModuleProps {
   rawMaterials: RawMaterial[];
@@ -1313,7 +1314,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <img src="/assets/aistudio/colorear-500px_0158e3cb.webp" alt="Colorear" className="h-8 w-auto" />
+                <img src={brandLogo()} alt={brandName()} className="h-8 w-auto" />
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-900">
                     HOJA OFICIAL DE FABRICACIÓN & TRAZABILIDAD
@@ -1542,7 +1543,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <img src="/assets/aistudio/colorear-500px_0158e3cb.webp" alt="Colorear" className="h-6 w-auto" />
+                        <img src={brandLogo()} alt={brandName()} className="h-6 w-auto" />
                         <span className="text-[10px] font-black uppercase text-slate-400">Industria Argentina</span>
                       </div>
                       <h4 className="text-base font-black text-slate-950 leading-tight">
@@ -1590,7 +1591,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                   </div>
 
                   <div className="mt-2 text-[9px] text-slate-400 text-center uppercase tracking-wider font-semibold">
-                    Colorear Pinturas S.R.L. • Parque Industrial Pilar, Bs As • Viscosidad: {viewingLabelsOrder.viscosityKU || 102} KU • pH: {viewingLabelsOrder.ph || 8.8}
+                    {legalName()} • Viscosidad: {viewingLabelsOrder.viscosityKU || 102} KU • pH: {viewingLabelsOrder.ph || 8.8}
                   </div>
                 </div>
               ))}

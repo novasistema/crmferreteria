@@ -659,27 +659,27 @@ export async function seedInitialDataIfEmpty() {
     // Company Configuration & ARCA Parameters
     const initialConfig: CompanyConfig = {
       id: 'main_config',
-      companyName: 'Colorear Pinturas S.R.L.',
-      tradeName: 'Colorear PINTURAS',
-      logoUrl: '/assets/aistudio/colorear-500px_0158e3cb.webp',
+      companyName: 'TU EMPRESA',
+      tradeName: 'TU EMPRESA',
+      logoUrl: '/assets/tu-empresa-logo.svg',
       cuit: '30-71489234-8',
       arcaPointOfSale: 4,
       arcaEnvironment: 'homologacion', // o produccion
       grossIncomeNumber: '901-294812-3',
       activityStartDate: '01/03/2012',
-      fiscalAddress: 'Av. Industria Química 4520, Parque Industrial Pilar, Buenos Aires',
-      plantAddress: 'Ruta 8 Km 58, Parque Industrial Pilar, Buenos Aires',
+      fiscalAddress: 'Dirección fiscal de tu empresa',
+      plantAddress: 'Dirección del local o depósito',
       phone: '+54 11 4890-7000',
       whatsappNumber: '5491148907000',
-      email: 'administracion@colorearpinturas.com.ar',
-      notificationWhatsappTemplate: 'Hola {cliente}, le informamos desde Colorear Pinturas que su pedido {pedido} se encuentra {estado}. Transporte asignado: {transporte}. Seguimiento: {tracking}. Muchas gracias.',
-      paymentReminderTemplate: 'Estimado/a {cliente}, le recordamos desde el área de administración de Colorear Pinturas que registra un saldo pendiente de ${monto}. Agradecemos coordinar la cancelación correspondiente. Datos de cuenta CBU: 0720045620000012345678.'
+      email: 'administracion@tuempresa.com.ar',
+      notificationWhatsappTemplate: 'Hola {cliente}, le informamos desde {empresa} que su pedido {pedido} se encuentra {estado}. Transporte asignado: {transporte}. Seguimiento: {tracking}. Muchas gracias.',
+      paymentReminderTemplate: 'Estimado/a {cliente}, le recordamos desde el área de administración de {empresa} que registra un saldo pendiente de ${monto}. Agradecemos coordinar la cancelación correspondiente. Datos de cuenta CBU: 0720045620000012345678.'
     };
 
     batch.set(doc(db, 'company_config', 'main_config'), initialConfig);
 
     await batch.commit();
-    console.log('Colorear Pinturas database initialized successfully with complete paint factory dataset.');
+    console.log('Base de demostración inicializada.');
   } catch (error) {
     console.error('Error seeding initial data:', error);
   }

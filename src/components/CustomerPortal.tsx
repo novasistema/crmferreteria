@@ -19,6 +19,7 @@ import {
   QrCode
 } from 'lucide-react';
 import { Customer, SalesOrder, CompanyConfig, LoyaltyReward, LoyaltyRaffle } from '../types';
+import { brandLogo, DEFAULT_LOGO, transferInfo } from '../utils/brand';
 
 interface CustomerPortalProps {
   customers: Customer[];
@@ -102,11 +103,11 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       <div className="max-w-md mx-auto my-12 bg-white rounded-3xl border border-slate-200 shadow-xl p-8 text-center animate-in fade-in">
         <div className="flex justify-center mb-4">
           <img 
-            src={config?.logoUrl || "/assets/aistudio/colorear-500px_0158e3cb.webp"} 
+            src={brandLogo(config)} 
             alt={brandName} 
             className="h-12 w-auto max-w-[200px] object-contain"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/assets/aistudio/colorear-500px_0158e3cb.webp';
+              (e.target as HTMLImageElement).src = DEFAULT_LOGO;
             }}
           />
         </div>
@@ -465,18 +466,24 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               <span className="text-slate-500">Razón Social:</span>
               <strong className="text-slate-900">{config?.companyName || brandName}</strong>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">CUIT:</span>
-              <strong className="font-mono text-slate-900">{config?.cuit || '30-71489234-8'}</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">CBU Banco Galicia:</span>
-              <strong className="font-mono text-slate-900">0070045620000012345678</strong>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">Alias CBU:</span>
-              <strong className="font-mono text-slate-900">COLOREAR.PINTURAS.PILAR</strong>
-            </div>
+            {config?.cuit && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">CUIT:</span>
+                <strong className="font-mono text-slate-900">{config.cuit}</strong>
+              </div>
+            )}
+            {transferInfo(config).cbu && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">CBU{transferInfo(config).bank ? ` ${transferInfo(config).bank}` : ''}:</span>
+                <strong className="font-mono text-slate-900">{transferInfo(config).cbu}</strong>
+              </div>
+            )}
+            {transferInfo(config).alias && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Alias CBU:</span>
+                <strong className="font-mono text-slate-900">{transferInfo(config).alias}</strong>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end">

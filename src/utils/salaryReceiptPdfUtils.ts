@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { Employee, SalaryPayment, CompanyConfig } from '../types';
+import { legalName } from './brand';
 
 /**
  * Generates an official DUPLICATE Salary / Advance Voucher PDF
@@ -11,7 +12,7 @@ export function generateSalaryDuplicateReceiptPDF(
   config?: CompanyConfig | null
 ) {
   const doc = new jsPDF();
-  const companyName = config?.companyName || 'Colorear Pinturas S.R.L.';
+  const companyName = legalName(config);
   const cuit = config?.cuit || '30-71489234-8';
   const fiscalAddress = config?.fiscalAddress || 'Parque Industrial Pilar, Buenos Aires';
   const dateFormatted = new Date(payment.date).toLocaleDateString('es-AR');
@@ -43,7 +44,7 @@ export function generateSalaryDuplicateReceiptPDF(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(211, 22, 39);
-    doc.text('COLOREAR PINTURAS S.R.L.', 18, startY + 9);
+    doc.text(companyName.toUpperCase(), 18, startY + 9);
 
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
@@ -182,7 +183,7 @@ export function generateSalaryDuplicateReceiptPDF(
 export function buildWhatsAppSalaryMessage(payment: SalaryPayment, employee: Employee): string {
   const dateFormatted = new Date(payment.date).toLocaleDateString('es-AR');
   return (
-    `*RECIBO DE HABERES - COLOREAR PINTURAS S.R.L.*\n\n` +
+    `*RECIBO DE HABERES - ${legalName().toUpperCase()}*\n\n` +
     `Hola *${employee.fullName}*,\n` +
     `Te informamos que se ha procesado el pago de *${payment.paymentType === 'adelanto' ? 'Adelanto de Sueldo' : 'Liquidación de Sueldo'}* correspondiente al período *${payment.period}*.\n\n` +
     `📄 *Nº Comprobante:* ${payment.paymentNumber}\n` +

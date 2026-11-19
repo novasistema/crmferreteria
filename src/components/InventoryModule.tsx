@@ -366,7 +366,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
     const data = filteredProducts.map(p => ({
       'Código': p.code,
       'Descripción / Producto': p.name,
-      'Marca': p.brand || 'Colorear',
+      'Marca': p.brand || '',
       'Cód. Proveedor': p.supplierCode || '-',
       'Rubro / Categoría': p.category,
       'Unidad / Presentación': p.presentation,

@@ -15,7 +15,7 @@ const INITIAL_BRANDS = [
   'ABRO', 'ACEITEX', 'ACOPLE', 'ACQUA SYSTEM', 'ADELBRAS', 'AGOREX',
   'AGROMEX', 'AGUA', 'AISLATECH', 'AKAI', 'AKAI ENERGY', 'ALAMBRE 100MM X 1MT',
   'ALAMBRE 127MM', 'ALAMBRE 65MM X 1MT', 'ALAMBRE 75MM X 1MT',
-  'ALBA', 'COLOREAR', 'STANLEY', 'DEWALT', 'BOSCH', 'BLACK & DECKER'
+  'ALBA', 'STANLEY', 'DEWALT', 'BOSCH', 'BLACK & DECKER'
 ];
 
 const INITIAL_RUBROS = [
@@ -182,7 +182,7 @@ export const MarcasRubrosModule: React.FC = () => {
               <label className="block text-xs font-bold text-slate-700 mb-1">Nombre</label>
               <input
                 type="text"
-                placeholder="Ej: COLOREAR, STANLEY..."
+                placeholder="Ej: ALBA, STANLEY..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg uppercase"

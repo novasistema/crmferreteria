@@ -31,6 +31,7 @@ import { DataDashboardWithBars } from './DataDashboardWithBars';
 import { CumpleanosModal } from './CumpleanosModal';
 import { ServicioTecnicoModal } from './ServicioTecnicoModal';
 import { MercadoPagoModal } from './MercadoPagoModal';
+import { legalName } from '../utils/brand';
 
 interface DesktopModuleProps {
   setActiveModule: (module: ModuleKey) => void;
@@ -93,7 +94,7 @@ export const DesktopModule: React.FC<DesktopModuleProps> = ({
       // 1. Resumen
       const summaryData = [
         ['INFORME DE GESTIÓN INTEGRAL (90 DÍAS) - NOVA SYSTEMS ERP'],
-        ['Empresa:', config?.companyName || 'Colorear Pinturas S.R.L.'],
+        ['Empresa:', legalName(config)],
         ['Período:', `${ninetyDaysAgo.toISOString().split('T')[0]} hasta ${now.toISOString().split('T')[0]}`],
         ['Fecha Emisión:', now.toLocaleString('es-AR')],
         [''],

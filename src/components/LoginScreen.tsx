@@ -17,6 +17,7 @@ import {
   Sliders
 } from 'lucide-react';
 import { AppUser, CompanyConfig } from '../types';
+import { brandName, legalName, brandLogo as logoOf, DEFAULT_LOGO } from '../utils/brand';
 
 interface LoginScreenProps {
   users: AppUser[];
@@ -96,13 +97,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setTimeout(() => passwordInputRef.current?.focus(), 0);
   };
 
-  const brandLogo = config?.logoUrl || '/assets/aistudio/colorear-500px_0158e3cb.webp';
-  const brandTradeName = config?.tradeName || config?.companyName || 'Colorear Pinturas';
-  const brandLegalName = config?.companyName || 'Colorear Pinturas S.R.L.';
+  const brandLogo = logoOf(config);
+  const brandTradeName = brandName(config);
+  const brandLegalName = legalName(config);
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-[#fafbfe] flex flex-col justify-between items-center px-4 py-8 select-none">
-      {/* Background Soft Organic Waves (matching reference image style with Colorear tones) */}
+      {/* Background Soft Organic Waves (matching reference image style soft tones) */}
       <div 
         className="pointer-events-none absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full blur-3xl opacity-40"
         style={{
@@ -153,7 +154,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               alt={brandTradeName} 
               className="h-12 w-auto max-w-[220px] object-contain"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/assets/aistudio/colorear-500px_0158e3cb.webp';
+                (e.target as HTMLImageElement).src = DEFAULT_LOGO;
               }}
             />
           </div>
@@ -195,7 +196,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   type="text"
                   value={emailOrUser}
                   onChange={e => setEmailOrUser(e.target.value)}
-                  placeholder="demo@colorearpinturas.com.ar"
+                  placeholder="usuario@tuempresa.com.ar"
                   className="w-full px-4 py-3.5 rounded-2xl bg-[#eff4fc] hover:bg-[#e8f0fe] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900 border border-transparent focus:border-slate-300 text-sm font-medium text-slate-900 transition-all placeholder:text-slate-400"
                 />
               </div>

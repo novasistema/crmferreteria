@@ -50,6 +50,7 @@ import {
   CompanyConfig, 
   AppUser 
 } from '../types';
+import { brandName, brandLogo } from '../utils/brand';
 
 interface SellersModuleProps {
   sellers: Seller[];
@@ -955,7 +956,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
                                 {/* WhatsApp */}
                                 {cleanPhone && (
                                   <a
-                                    href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hola ${stop.customerName}, te saluda ${route.sellerName} de Colorear Pinturas. Estoy en recorrido hacia su local.`)}`}
+                                    href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hola ${stop.customerName}, te saluda ${route.sellerName} de ${brandName()}. Estoy en recorrido hacia su local.`)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg border border-emerald-200"
@@ -1288,7 +1289,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
                     type="email"
                     value={sellerForm.email}
                     onChange={e => setSellerForm({ ...sellerForm, email: e.target.value })}
-                    placeholder="vendedor@colorear.com.ar"
+                    placeholder="vendedor@tuempresa.com.ar"
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-300"
                   />
                 </div>
@@ -1829,7 +1830,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <img src="/assets/aistudio/colorear-500px_0158e3cb.webp" alt="Colorear" className="h-8 w-auto" />
+                <img src={brandLogo()} alt={brandName()} className="h-8 w-auto" />
                 <div>
                   <h3 className="font-black text-sm text-slate-900 uppercase">
                     HOJA DE RUTA COMERCIAL - PREVENTA CALLE
@@ -2129,7 +2130,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
             {/* Modal Footer */}
             <div className="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">
-                Auditoría Gerencial Colorear Pinturas • Trazabilidad en Calle
+                Auditoría Gerencial {brandName()} • Trazabilidad en Calle
               </span>
               <button
                 type="button"
@@ -2326,7 +2327,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
             {/* Modal Footer */}
             <div className="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">
-                Sistema de Control y Georreferenciación de Preventa • Fábrica Colorear
+                Sistema de Control y Georreferenciación de Preventa • {brandName()}
               </span>
               <button
                 type="button"

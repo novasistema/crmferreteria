@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { Customer, FinancialTransaction, CompanyConfig, SalesOrder } from '../types';
+import { brandName, legalName } from './brand';
 
 export interface PaymentReceiptData {
   receiptNumber: string;
@@ -16,13 +17,13 @@ export interface PaymentReceiptData {
 }
 
 /**
- * Generates an official Colorear Pinturas payment receipt PDF and downloads it
+ * Generates an official payment receipt PDF and downloads it
  */
 export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: CompanyConfig | null) {
   const doc = new jsPDF();
   const dateFormatted = new Date(receipt.date).toLocaleDateString('es-AR');
-  const companyName = config?.companyName || 'Colorear Pinturas S.R.L.';
-  const tradeName = config?.tradeName || 'Colorear PINTURAS';
+  const companyName = legalName(config);
+  const tradeName = brandName(config);
   const cuit = config?.cuit || '30-71489234-8';
   const fiscalAddress = config?.fiscalAddress || 'Parque Industrial Pilar, Buenos Aires';
   const phone = config?.phone || '+54 11 4890-7000';
@@ -43,14 +44,14 @@ export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: 
     doc.rect(idx * stripWidth, 0, stripWidth, 4, 'F');
   });
 
-  // 2. Header banner (Colorear brand red)
+  // 2. Header banner (brand color)
   doc.setFillColor(211, 22, 39);
   doc.rect(0, 4, 210, 26, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('COLOREAR PINTURAS', 14, 16);
+  doc.text(tradeName.toUpperCase(), 14, 16);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -182,7 +183,7 @@ export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: 
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.text('Firma y Sello de Administración / Tesorería', 54, signatureY + 5, { align: 'center' });
-  doc.text('Colorear Pinturas S.R.L.', 54, signatureY + 9, { align: 'center' });
+  doc.text(companyName, 54, signatureY + 9, { align: 'center' });
 
   doc.text('Conforme Cliente / Pagador', 156, signatureY + 5, { align: 'center' });
   doc.text(receipt.customer.businessName, 156, signatureY + 9, { align: 'center' });
@@ -191,7 +192,7 @@ export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: 
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
   doc.text('Este comprobante acredita la recepción conforme de los fondos especificados para imputación en cuenta corriente.', 14, 275);
-  doc.text(`Generado electrónicamente por el Sistema de Gestión Colorear Pinturas el ${new Date().toLocaleString('es-AR')}`, 14, 280);
+  doc.text(`Generado electrónicamente por el Sistema de Gestión de ${companyName} el ${new Date().toLocaleString('es-AR')}`, 14, 280);
 
   // Save PDF
   const cleanNum = receipt.receiptNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -202,7 +203,7 @@ export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: 
  * Builds a structured WhatsApp message to send the receipt details directly to the customer
  */
 export function buildWhatsAppReceiptMessage(receipt: PaymentReceiptData, config?: CompanyConfig | null): string {
-  const companyName = config?.companyName || 'Colorear Pinturas S.R.L.';
+  const companyName = legalName(config);
   const dateStr = new Date(receipt.date).toLocaleDateString('es-AR');
 
   return (
@@ -218,6 +219,6 @@ export function buildWhatsAppReceiptMessage(receipt: PaymentReceiptData, config?
     `• Saldo Anterior: $ ${receipt.previousBalance.toLocaleString('es-AR')}\n` +
     `• Pago Imputado: -$ ${receipt.amount.toLocaleString('es-AR')}\n` +
     `• *Saldo Pendiente Actual: $ ${receipt.newBalance.toLocaleString('es-AR')}*\n\n` +
-    `Muchas gracias por confiar en Colorear Pinturas. Cualquier consulta administrativa estamos a su disposición.`
+    `Muchas gracias por confiar en ${companyName}. Cualquier consulta administrativa estamos a su disposición.`
   );
 }

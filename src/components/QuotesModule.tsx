@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Quote, QuoteStatus, Customer, Product, CompanyConfig, SalesOrder, DeliveryOrder } from '../types';
 import { generateQuotePDF } from '../utils/quoteAndDeliveryPdfUtils';
+import { brandName } from '../utils/brand';
 
 interface QuotesModuleProps {
   quotes: Quote[];
@@ -360,7 +361,7 @@ export const QuotesModule: React.FC<QuotesModuleProps> = ({
 
             // WhatsApp Message
             const clientPhoneClean = (quote.customerPhone || '').replace(/[^0-9]/g, '');
-            const customWhatsAppMsg = `Hola ${quote.customerName}, le enviamos el Presupuesto Oficial N° ${quote.quoteNumber} de Colorear Pinturas por un total de $${quote.total.toLocaleString('es-AR')}. Incluye ${totalUnits} bultos/envases con validez hasta el ${new Date(quote.validUntil).toLocaleDateString('es-AR')}. Para confirmar su pedido puede responder a este mensaje.`;
+            const customWhatsAppMsg = `Hola ${quote.customerName}, le enviamos el Presupuesto Oficial N° ${quote.quoteNumber} de ${brandName()} por un total de $${quote.total.toLocaleString('es-AR')}. Incluye ${totalUnits} bultos/envases con validez hasta el ${new Date(quote.validUntil).toLocaleDateString('es-AR')}. Para confirmar su pedido puede responder a este mensaje.`;
 
             return (
               <div 

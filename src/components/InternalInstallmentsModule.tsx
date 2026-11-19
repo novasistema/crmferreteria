@@ -31,6 +31,7 @@ import {
   CompanyConfig, 
   Cashbox 
 } from '../types';
+import { legalName } from '../utils/brand';
 
 interface InternalInstallmentsModuleProps {
   plans: InternalInstallmentPlan[];
@@ -1059,7 +1060,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
               <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3">
                 <div>
                   <h2 className="text-xl font-extrabold uppercase tracking-tight text-slate-900">
-                    {config?.companyName || 'COLOREAR PINTURAS S.A.'}
+                    {legalName(config)}
                   </h2>
                   <p className="text-xs text-slate-600">
                     {config?.fiscalAddress || 'Planta Industrial Km 38.5'} - CUIT: {config?.cuit || '30-71122334-4'}
@@ -1164,7 +1165,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
                   <div className="text-[10px] text-slate-500">Aclaración y DNI</div>
                 </div>
                 <div className="border-t border-slate-400 pt-1">
-                  <div className="font-bold">Por Colorear Pinturas</div>
+                  <div className="font-bold">Por {legalName(config)}</div>
                   <div className="text-[10px] text-slate-500">Firma Autorizada</div>
                 </div>
               </div>
@@ -1184,7 +1185,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
               <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3">
                 <div>
                   <h2 className="text-xl font-extrabold uppercase tracking-tight text-slate-900">
-                    {config?.companyName || 'COLOREAR PINTURAS S.A.'}
+                    {legalName(config)}
                   </h2>
                   <p className="text-xs text-slate-600">
                     CONTRATO DE VENTA EN CUOTAS CON FINANCIACIÓN INTERNA
@@ -1232,7 +1233,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
                   <div className="font-bold">Recibí Conforme (Cliente)</div>
                 </div>
                 <div className="border-t border-slate-400 pt-1">
-                  <div className="font-bold">Por Colorear Pinturas S.A.</div>
+                  <div className="font-bold">Por {legalName(config)}</div>
                 </div>
               </div>
             </div>

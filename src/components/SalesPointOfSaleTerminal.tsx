@@ -44,6 +44,7 @@ import {
 } from '../types';
 import { generateQuotePDF, generateRemitoPDF } from '../utils/quoteAndDeliveryPdfUtils';
 import { SalesCheckoutFlowModal, CheckoutResult } from './SalesCheckoutFlowModal';
+import { brandName } from '../utils/brand';
 
 interface SalesPointOfSaleTerminalProps {
   products: Product[];
@@ -1236,7 +1237,7 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
               <div>
                 <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
                   <Package className="w-5 h-5 text-blue-600" />
-                  Catálogo Oficial de Pinturas Colorear
+                  Catálogo de productos
                 </h3>
                 <p className="text-xs text-slate-500">
                   Seleccione los productos para agregarlos a la venta / presupuesto.
@@ -1319,7 +1320,7 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
             <div className="p-3 bg-sky-50 rounded-xl border border-sky-100 text-xs text-sky-900 space-y-1">
               <p className="font-bold">QR Estático y Cobro en Mostrador:</p>
               <p className="text-[11px] text-sky-800">
-                Los clientes pueden abonar escaneando el código QR de Colorear Pinturas en el mostrador.
+                Los clientes pueden abonar escaneando el código QR de {brandName()} en el mostrador.
               </p>
             </div>
 

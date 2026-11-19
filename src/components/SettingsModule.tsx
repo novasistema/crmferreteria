@@ -39,6 +39,7 @@ import {
   resetSystemToFactory,
   BackupPackage 
 } from '../services/backupAndResetService';
+import { brandName, legalName, brandLogo, DEFAULT_LOGO } from '../utils/brand';
 
 interface SettingsModuleProps {
   config: CompanyConfig | null;
@@ -59,21 +60,21 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
   const [formData, setFormData] = useState<CompanyConfig>(() => {
     return config || {
       id: 'main_config',
-      companyName: 'Colorear Pinturas S.R.L.',
-      tradeName: 'Colorear PINTURAS',
-      logoUrl: '/assets/aistudio/colorear-500px_0158e3cb.webp',
+      companyName: 'TU EMPRESA',
+      tradeName: 'TU EMPRESA',
+      logoUrl: DEFAULT_LOGO,
       cuit: '30-71489234-8',
       arcaPointOfSale: 4,
       arcaEnvironment: 'homologacion',
       grossIncomeNumber: '901-294812-3',
       activityStartDate: '01/03/2012',
-      fiscalAddress: 'Av. Industria Química 4520, Parque Industrial Pilar, Buenos Aires',
-      plantAddress: 'Ruta 8 Km 58, Parque Industrial Pilar, Buenos Aires',
+      fiscalAddress: 'Dirección fiscal de tu empresa',
+      plantAddress: 'Dirección del local o depósito',
       phone: '+54 11 4890-7000',
       whatsappNumber: '5491148907000',
-      email: 'administracion@colorearpinturas.com.ar',
-      notificationWhatsappTemplate: 'Hola {cliente}, le informamos desde Colorear Pinturas que su pedido {pedido} se encuentra {estado}. Transporte: {transporte}. Seguimiento: {tracking}. Total: ${total}. Muchas gracias.',
-      paymentReminderTemplate: 'Estimado/a {cliente}, le recordamos desde el área de administración de Colorear Pinturas que registra un saldo pendiente de ${monto}. Agradecemos coordinar la cancelación correspondiente. Datos de cuenta CBU: 0720045620000012345678.'
+      email: 'administracion@tuempresa.com.ar',
+      notificationWhatsappTemplate: 'Hola {cliente}, le informamos desde {empresa} que su pedido {pedido} se encuentra {estado}. Transporte: {transporte}. Seguimiento: {tracking}. Total: ${total}. Muchas gracias.',
+      paymentReminderTemplate: 'Estimado/a {cliente}, le recordamos desde el área de administración de {empresa} que registra un saldo pendiente de ${monto}. Agradecemos coordinar la cancelación correspondiente. Datos de cuenta CBU: 0720045620000012345678.'
     };
   });
 
@@ -82,7 +83,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
     if (config) {
       setFormData(prev => ({
         ...config,
-        logoUrl: config.logoUrl || prev.logoUrl || '/assets/aistudio/colorear-500px_0158e3cb.webp'
+        logoUrl: config.logoUrl || prev.logoUrl || DEFAULT_LOGO
       }));
     }
   }, [config]);
@@ -174,7 +175,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (!parsed.data) {
-          throw new Error("El archivo no tiene el formato de backup válido de Colorear Pinturas.");
+          throw new Error("El archivo no tiene el formato de backup válido del sistema.");
         }
         setRestorePackage(parsed);
       } catch (err: any) {
@@ -204,7 +205,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
 
   // Handler: Execute Factory Reset (Dejar en Cero)
   const handleExecuteFactoryReset = async () => {
-    const requiredPhrase = 'RESET COLOREAR';
+    const requiredPhrase = 'RESET SISTEMA';
     if (confirmationPhrase.trim().toUpperCase() !== requiredPhrase && confirmationPhrase.trim().toUpperCase() !== 'BORRAR TODO') {
       alert(`Para confirmar debe escribir exactamente '${requiredPhrase}' o 'BORRAR TODO'.`);
       return;
@@ -374,9 +375,9 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, logoUrl: '/assets/aistudio/colorear-500px_0158e3cb.webp' }))}
+                    onClick={() => setFormData(prev => ({ ...prev, logoUrl: DEFAULT_LOGO }))}
                     className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                    title="Restablecer el logo original de Colorear Pinturas"
+                    title="Volver al logo genérico TU EMPRESA"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
                     <span>Restablecer</span>
@@ -393,7 +394,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
                   type="text"
                   value={formData.logoUrl || ''}
                   onChange={e => setFormData({ ...formData, logoUrl: e.target.value })}
-                  placeholder="/assets/aistudio/colorear-500px_0158e3cb.webp o https://..."
+                  placeholder="https://... (link a la imagen del logo)"
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-mono text-slate-800 bg-white"
                 />
               </div>
@@ -408,20 +409,20 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
                   <div className="flex items-center gap-2.5">
                     <div className="h-9 px-2.5 py-1 bg-white rounded-lg flex items-center justify-center shadow-md border border-slate-700/80">
                       <img 
-                        src={formData.logoUrl || '/assets/aistudio/colorear-500px_0158e3cb.webp'} 
+                        src={brandLogo(formData)} 
                         alt="Preview Topbar" 
                         className="h-6 w-auto max-w-[120px] object-contain"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/assets/aistudio/colorear-500px_0158e3cb.webp';
+                          (e.target as HTMLImageElement).src = DEFAULT_LOGO;
                         }}
                       />
                     </div>
                     <div className="flex flex-col">
                       <span className="font-extrabold text-xs sm:text-sm text-white leading-tight">
-                        {formData.tradeName || 'Colorear Pinturas'}
+                        {brandName(formData)}
                       </span>
                       <span className="text-[10px] text-slate-400 font-medium leading-none">
-                        {formData.companyName || 'Colorear Pinturas S.R.L.'}
+                        {legalName(formData)}
                       </span>
                     </div>
                   </div>
@@ -435,17 +436,17 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-white rounded-xl shadow-xs border border-slate-200">
                       <img 
-                        src={formData.logoUrl || '/assets/aistudio/colorear-500px_0158e3cb.webp'} 
+                        src={brandLogo(formData)} 
                         alt="Preview Login" 
                         className="h-8 w-auto max-w-[120px] object-contain"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/assets/aistudio/colorear-500px_0158e3cb.webp';
+                          (e.target as HTMLImageElement).src = DEFAULT_LOGO;
                         }}
                       />
                     </div>
                     <div>
                       <span className="font-black text-xs sm:text-sm text-slate-900 block leading-tight">
-                        ¡Bienvenido a {formData.tradeName || 'Colorear'}!
+                        ¡Bienvenido a {brandName(formData)}!
                       </span>
                       <span className="text-[10px] text-slate-500 font-medium">
                         Acceso de personal de fábrica
@@ -831,7 +832,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
                   {restoreFile ? restoreFile.name : 'Haz clic para seleccionar o arrastra tu archivo .json de backup'}
                 </span>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  Formato compatible: backup_colorear_pinturas_*.json
+                  Formato compatible: backup_sistema_*.json
                 </span>
               </label>
             </div>
@@ -1139,14 +1140,14 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
               </label>
               <p className="text-xs text-slate-600">
                 Para confirmar la eliminación y puesta en cero, escribe exactamente{' '}
-                <strong className="text-red-700 font-mono select-all">RESET COLOREAR</strong> o{' '}
+                <strong className="text-red-700 font-mono select-all">RESET SISTEMA</strong> o{' '}
                 <strong className="text-red-700 font-mono select-all">BORRAR TODO</strong> en la casilla inferior:
               </p>
               <input
                 type="text"
                 value={confirmationPhrase}
                 onChange={e => setConfirmationPhrase(e.target.value)}
-                placeholder="Escribe RESET COLOREAR para confirmar"
+                placeholder="Escribe RESET SISTEMA para confirmar"
                 className="w-full text-sm p-3 rounded-xl border-2 border-red-300 font-mono font-black text-red-700 focus:outline-hidden focus:border-red-600"
               />
             </div>
@@ -1174,7 +1175,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
                 onClick={handleExecuteFactoryReset}
                 disabled={
                   isResetting ||
-                  (confirmationPhrase.trim().toUpperCase() !== 'RESET COLOREAR' &&
+                  (confirmationPhrase.trim().toUpperCase() !== 'RESET SISTEMA' &&
                     confirmationPhrase.trim().toUpperCase() !== 'BORRAR TODO')
                 }
                 className="bg-[#d31627] hover:bg-red-800 text-white font-black text-xs px-6 py-3.5 rounded-xl shadow-xl transition-all flex items-center gap-2 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"

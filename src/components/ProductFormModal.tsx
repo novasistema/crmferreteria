@@ -45,7 +45,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     'Accesorios y Seguridad',
     'Herramientas y Pincelería'
   ],
-  brands = ['Colorear', 'Colorear Industrial', 'Stanley', 'Plavicon', 'Alba', 'Sinteplast']
+  brands = ['Stanley', 'Plavicon', 'Alba', 'Sinteplast']
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'costos' | 'inventario' | 'fraccionado' | 'ecommerce'>('general');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +62,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [primaryUnit, setPrimaryUnit] = useState('Unidad');
   const [salesUnit, setSalesUnit] = useState('Unidad');
   const [category, setCategory] = useState(categories[0] || 'Pinturas');
-  const [brand, setBrand] = useState('Colorear');
+  const [brand, setBrand] = useState('');
   const [showNewBrandInput, setShowNewBrandInput] = useState(false);
   const [newBrandName, setNewBrandName] = useState('');
   const [supplierPrincipal, setSupplierPrincipal] = useState('');
@@ -129,7 +129,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setPrimaryUnit(productToEdit.primaryUnit || productToEdit.presentation || 'Unidad');
       setSalesUnit(productToEdit.salesUnit || productToEdit.presentation || 'Unidad');
       setCategory(productToEdit.category || 'Terminación para Mampostería');
-      setBrand(productToEdit.brand || 'Colorear');
+      setBrand(productToEdit.brand || '');
       setSupplierPrincipal(productToEdit.supplierName || '');
       setSupplierCode(productToEdit.supplierCode || '');
       setCurrencyBuy(productToEdit.currencyBuy || 'ARS');
@@ -187,7 +187,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setPrimaryUnit('Unidad');
       setSalesUnit('Unidad');
       setCategory(categories[0] || 'Terminación para Mampostería');
-      setBrand('Colorear');
+      setBrand('');
       setSupplierPrincipal(suppliers[0]?.businessName || 'Química del Plata S.A.');
       setSupplierCode(`PROV-${Math.floor(Math.random() * 899 + 100)}`);
       setCostListWithoutIva(5000);

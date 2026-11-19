@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { ModuleKey, UserRole } from '../types';
 import { isModuleOn } from '../utils/modules';
+import { legalName } from '../utils/brand';
 
 interface SidebarProps {
   activeModule: ModuleKey;
@@ -645,7 +646,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </div>
         <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
-          <span>Colorear Pinturas S.R.L.</span>
+          <span>{legalName()}</span>
           <span className="text-[9px] text-slate-400 font-mono">22 Módulos ERP</span>
         </div>
       </div>

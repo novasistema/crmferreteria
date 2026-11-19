@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { Quote, DeliveryOrder, CompanyConfig } from '../types';
+import { brandName, legalName } from './brand';
 
 /**
  * Presupuesto en formato comprobante "X" (A4, ORIGINAL + DUPLICADO) con IVA discriminado:
@@ -247,13 +248,13 @@ export function generateQuotePDF(quote: Quote, config?: CompanyConfig | null) {
 }
 
 /**
- * Generates an official Colorear Pinturas Remito de Entrega / Despacho (Documento No Válido Como Factura)
+ * Generates an official Remito de Entrega / Despacho (Documento No Válido Como Factura)
  */
 export function generateRemitoPDF(remito: DeliveryOrder, config?: CompanyConfig | null) {
   const doc = new jsPDF();
   const dateFormatted = new Date(remito.date).toLocaleDateString('es-AR');
-  const companyName = config?.companyName || 'Colorear Pinturas S.R.L.';
-  const tradeName = config?.tradeName || 'Colorear PINTURAS';
+  const companyName = legalName(config);
+  const tradeName = brandName(config);
   const cuit = config?.cuit || '30-71489234-8';
   const fiscalAddress = config?.fiscalAddress || 'Parque Industrial Pilar, Buenos Aires';
   const phone = config?.phone || '+54 11 4890-7000';
@@ -281,7 +282,7 @@ export function generateRemitoPDF(remito: DeliveryOrder, config?: CompanyConfig 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('COLOREAR PINTURAS', 14, 16);
+  doc.text(tradeName.toUpperCase(), 14, 16);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');

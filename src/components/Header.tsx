@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { NotificationItem, ModuleKey, CompanyConfig, AppUser, Seller } from '../types';
 import { isModuleOn as isModuleEnabled } from '../utils/modules';
+import { brandName, legalName, brandLogo as logoOf } from '../utils/brand';
 
 interface HeaderProps {
   activeModule: ModuleKey;
@@ -124,9 +125,9 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveDropdown(null);
   };
 
-  const brandLogo = config?.logoUrl || '/assets/aistudio/colorear-500px_0158e3cb.webp';
-  const brandTradeName = config?.tradeName || config?.companyName || 'Colorear Pinturas';
-  const brandLegalName = config?.companyName || 'Colorear Pinturas S.R.L.';
+  const brandLogo = logoOf(config);
+  const brandTradeName = brandName(config);
+  const brandLegalName = legalName(config);
 
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 select-none shadow-md" ref={dropdownRef}>

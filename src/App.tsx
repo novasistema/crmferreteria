@@ -135,6 +135,7 @@ import { ListasPreciosModule } from './components/products/ListasPreciosModule';
 import { ActualizacionPreciosModule } from './components/products/ActualizacionPreciosModule';
 import { TransferenciasModule } from './components/products/TransferenciasModule';
 import { PedidosSucursalModule } from './components/products/PedidosSucursalModule';
+import { brandName, legalName, brandLogo, setBrandConfig, isLegacyDemoBrand, DEFAULT_BRAND_NAME, DEFAULT_LOGO } from './utils/brand';
 
 // Fecha local (Argentina) en formato AAAA-MM-DD: toISOString() usa UTC y después de las 21 hs marca el día siguiente
 const loyaltyToday = () => {
@@ -269,6 +270,7 @@ export default function App() {
   const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null);
+  setBrandConfig(companyConfig); // nombre y logo de la empresa para PDFs y mensajes
   const [checks, setChecks] = useState<CheckItem[]>([]);
   const [cashboxes, setCashboxes] = useState<Cashbox[]>([]);
   const [cashMovements, setCashMovements] = useState<CashMovement[]>([]);
@@ -328,7 +330,7 @@ export default function App() {
 
   // Sync browser title with dynamic company name
   useEffect(() => {
-    const titleName = companyConfig?.tradeName || companyConfig?.companyName || 'Colorear Pinturas';
+    const titleName = brandName(companyConfig);
     document.title = `${titleName} - CRM & ERP Industrial`;
   }, [companyConfig]);
 
@@ -529,7 +531,21 @@ export default function App() {
         // 13. Company Config
         const unsubConfig = onSnapshot(collection(db, 'company_config'), snap => {
           if (!snap.empty) {
-            setCompanyConfig(snap.docs[0].data() as CompanyConfig);
+            const cfg = snap.docs[0].data() as CompanyConfig;
+            setCompanyConfig(cfg);
+            // La configuración de demostración traía la marca Colorear: se pasa a la marca genérica TU EMPRESA
+            if (isLegacyDemoBrand(cfg)) {
+              const fixTpl = (t?: string) => (t ? t.replace(/Colorear Pinturas( S\.R\.L\.| S\.A\.)?/gi, '{empresa}') : t);
+              const patch: Partial<CompanyConfig> = {
+                companyName: /colorear/i.test(cfg.companyName || '') ? DEFAULT_BRAND_NAME : cfg.companyName,
+                tradeName: /colorear/i.test(cfg.tradeName || '') ? DEFAULT_BRAND_NAME : cfg.tradeName,
+                logoUrl: DEFAULT_LOGO,
+                email: /colorear/i.test(cfg.email || '') ? '' : cfg.email,
+                notificationWhatsappTemplate: fixTpl(cfg.notificationWhatsappTemplate),
+                paymentReminderTemplate: fixTpl(cfg.paymentReminderTemplate)
+              };
+              setDoc(doc(db, 'company_config', snap.docs[0].id), patch, { merge: true }).catch(e => console.error('No se pudo actualizar la marca:', e));
+            }
           }
         }, error => {
           handleFirestoreError(error, OperationType.GET, 'company_config');
@@ -2268,8 +2284,8 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-4">
         <img 
-          src="/assets/aistudio/colorear-500px_0158e3cb.webp" 
-          alt="Colorear Pinturas" 
+          src={brandLogo(companyConfig)} 
+          alt={brandName(companyConfig)} 
           className="h-16 w-auto object-contain mb-4 animate-pulse"
         />
         <div className="flex items-center gap-2 text-sm text-slate-300">
@@ -2351,8 +2367,8 @@ export default function App() {
           <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between text-xs font-semibold">
             <div className="flex items-center gap-2">
               <img 
-                src={companyConfig?.logoUrl || "/assets/aistudio/colorear-500px_0158e3cb.webp"} 
-                alt={companyConfig?.tradeName || "Colorear Pinturas"} 
+                src={brandLogo(companyConfig)} 
+                alt={brandName(companyConfig)} 
                 className="h-6 w-auto brightness-0 invert" 
               />
               <span>Portal Oficial de Clientes & Pinturerías</span>
@@ -3237,7 +3253,7 @@ export default function App() {
               config={companyConfig}
               onAuthorizeOrderManually={handleAuthorizeOrderManually}
               onSendInvoiceWhatsApp={(voucher, phone) => {
-                const text = encodeURIComponent(`Hola, le enviamos el comprobante fiscal ${voucher.voucherType} N° ${voucher.voucherNumber} con CAE ${voucher.cae} emitido por Colorear Pinturas S.A. Verificación oficial: ${voucher.afipQrUrl}`);
+                const text = encodeURIComponent(`Hola, le enviamos el comprobante fiscal ${voucher.voucherType} N° ${voucher.voucherNumber} con CAE ${voucher.cae} emitido por ${legalName(companyConfig)} Verificación oficial: ${voucher.afipQrUrl}`);
                 window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
               }}
             />

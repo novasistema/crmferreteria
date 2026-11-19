@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { SalesOrder, PurchaseOrder, ProductionOrder, Product, RawMaterial, CompanyConfig, CashMovement } from '../types';
+import { legalName } from '../utils/brand';
 
 interface AccountingAndProfitabilityModuleProps {
   salesOrders: SalesOrder[];
@@ -244,7 +245,7 @@ export const AccountingAndProfitabilityModule: React.FC<AccountingAndProfitabili
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Libro IVA Ventas');
-    XLSX.writeFile(workbook, `Libro_IVA_Ventas_Colorear_${selectedYear}_${monthNames[selectedMonth]}.xlsx`);
+    XLSX.writeFile(workbook, `Libro_IVA_Ventas_${selectedYear}_${monthNames[selectedMonth]}.xlsx`);
   };
 
   return (
@@ -608,7 +609,7 @@ export const AccountingAndProfitabilityModule: React.FC<AccountingAndProfitabili
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
             <h3 className="text-base font-black text-slate-900 pb-3 border-b border-slate-100 mb-4 flex items-center gap-2">
               <Scale className="w-5 h-5 text-emerald-600" />
-              Estado de Resultados Operativo (P&L) - Colorear Pinturas S.R.L.
+              Estado de Resultados Operativo (P&L) - {legalName()}
             </h3>
 
             <div className="space-y-3 text-xs max-w-2xl">

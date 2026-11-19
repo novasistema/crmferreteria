@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Product, CompanyConfig, Formula, ProductionOrder } from '../types';
 import { exportPriceListToExcel, exportPriceListToPDF } from '../utils/exportUtils';
+import { brandName } from '../utils/brand';
 
 // Standard packaging options with real packaging cost in ARS and volume/weight details
 export const PACKAGING_OPTIONS = [
@@ -291,7 +292,7 @@ export const PriceListModule: React.FC<PriceListModuleProps> = ({
                   Lista Oficial de Precios & Catálogo
                 </h1>
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                  Colorear Pinturas Oficial
+                  {brandName()}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

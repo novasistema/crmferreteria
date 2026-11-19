@@ -340,7 +340,7 @@ export const UsersModule: React.FC<UsersModuleProps> = ({
                   type="email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
-                  placeholder="ejemplo@colorearpinturas.com.ar"
+                  placeholder="ejemplo@tuempresa.com.ar"
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-medium"
                   required
                 />

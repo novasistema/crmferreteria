@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { PurchaseOrder, CompanyConfig, Supplier } from '../types';
+import { brandName, legalName } from './brand';
 
 /**
  * Generates an official Purchase Order PDF (Orden de Compra a Proveedor) and downloads it.
@@ -14,13 +15,13 @@ export function generatePurchaseOrderPDF(
     ? new Date(order.date).toLocaleDateString('es-AR') 
     : new Date().toLocaleDateString('es-AR');
 
-  const companyName = config?.companyName || 'Colorear Pinturas S.R.L.';
-  const tradeName = config?.tradeName || 'Colorear PINTURAS';
+  const companyName = legalName(config);
+  const tradeName = brandName(config);
   const cuit = config?.cuit || '30-71489234-8';
   const fiscalAddress = config?.fiscalAddress || 'Parque Industrial Pilar, Buenos Aires';
   const plantAddress = config?.plantAddress || 'Ruta 8 Km 58, Parque Industrial Pilar';
   const phone = config?.phone || '+54 11 4890-7000';
-  const email = config?.email || 'compras@colorearpinturas.com';
+  const email = config?.email || '';
 
   const supName = order.supplierName || supplier?.businessName || 'Proveedor';
   const supTaxId = order.supplierTaxId || supplier?.taxId || 'Sin CUIT';
@@ -211,7 +212,7 @@ export function generatePurchaseOrderPDF(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text('Documento generado electrónicamente por el Sistema ERP & Gestión Fabril de Colorear Pinturas.', 105, footerY, { align: 'center' });
+  doc.text('Documento generado electrónicamente por el Sistema ERP & Gestión de ' + companyName + '.', 105, footerY, { align: 'center' });
 
   // Save / Download PDF
   const filename = `OrdenDeCompra_${order.orderNumber || 'OC'}_${supName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
@@ -223,7 +224,7 @@ export function generatePurchaseOrderPDF(
  */
 export function buildPurchaseOrderWhatsAppMessage(
   order: PurchaseOrder,
-  companyName: string = 'Colorear Pinturas'
+  companyName: string = brandName()
 ): string {
   const itemsText = (order.items || [])
     .map((item, idx) => {
