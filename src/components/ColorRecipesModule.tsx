@@ -24,6 +24,7 @@ import {
   ColorBatch,
   ColorBatchLine
 } from '../types';
+import { NumInput } from './NumInput';
 
 interface ColorRecipesModuleProps {
   rawMaterials: RawMaterial[];
@@ -500,8 +501,7 @@ export const ColorRecipesModule: React.FC<ColorRecipesModuleProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <label className="block">
                     <span className="text-xs font-bold text-slate-600">Cantidad</span>
-                    <input
-                      type="number"
+                    <NumInput
                       min={0}
                       step="any"
                       value={calcQty}
@@ -727,7 +727,7 @@ export const ColorRecipesModule: React.FC<ColorRecipesModuleProps> = ({
             </label>
             <label className="md:col-span-1 block">
               <span className="text-xs font-bold text-slate-600">Densidad (kg/L)</span>
-              <input type="number" step="0.001" min={0.1} value={editing.density} onChange={e => setEditing({ ...editing, density: Number(e.target.value) })} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono" />
+              <NumInput step="0.001" min={0.1} value={editing.density} onChange={e => setEditing({ ...editing, density: Number(e.target.value) })} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono" />
             </label>
           </div>
 
@@ -772,8 +772,7 @@ export const ColorRecipesModule: React.FC<ColorRecipesModuleProps> = ({
                       {rawMaterials.map(m => <option key={m.id} value={m.id}>[{m.category}] {m.code} · {m.name}</option>)}
                     </select>
                     <div className="relative w-32">
-                      <input
-                        type="number"
+                      <NumInput
                         step="any"
                         min={0}
                         value={it.percentage}

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CompanyConfig, ArcaConnectionTest } from '../types';
 import { callArca, downloadTextFile } from '../services/arcaClient';
+import { NumInput } from './NumInput';
 
 interface ArcaSetupWizardProps {
   config: CompanyConfig | null;
@@ -265,7 +266,7 @@ export const ArcaSetupWizard: React.FC<ArcaSetupWizardProps> = ({ config, onSave
               </label>
               <label className="block">
                 <span className="text-xs font-bold text-slate-600">Punto de venta (Web Services)</span>
-                <input type="number" min={1} value={pointOfSale} onChange={e => setPointOfSale(Number(e.target.value))} className={`${inputCls} font-mono`} />
+                <NumInput min={1} value={pointOfSale} onChange={e => setPointOfSale(Number(e.target.value))} className={`${inputCls} font-mono`} />
               </label>
               <label className="block">
                 <span className="text-xs font-bold text-slate-600">Ambiente</span>

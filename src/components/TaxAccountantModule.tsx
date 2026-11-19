@@ -44,6 +44,7 @@ import {
   MonthlyTaxResult,
   round2
 } from '../services/taxEngine';
+import { NumInput, parseArNumber } from './NumInput';
 
 interface TaxAccountantModuleProps {
   config: CompanyConfig | null;
@@ -558,7 +559,7 @@ const AdjustmentsPanel: React.FC<{ periodDoc: TaxPeriod; period: string; canEdit
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
-    const value = Number(String(amount).replace(/\./g, '').replace(',', '.'));
+    const value = (parseArNumber(String(amount)) ?? NaN);
     if (!(value > 0)) return alert('Ingresá un importe mayor a 0.');
     setBusy(true);
     try {
@@ -670,7 +671,7 @@ const SettingsPanel: React.FC<{ settings: TaxSettings; canEdit: boolean; onSave:
         </label>
         <label className="block">
           <span className="text-xs font-bold text-slate-600">Día de vencimiento IVA</span>
-          <input disabled={!canEdit} type="number" min={1} max={31} value={s.ivaDueDay} onChange={e => set('ivaDueDay', Number(e.target.value))} className={inputCls} />
+          <NumInput disabled={!canEdit} min={1} max={31} value={s.ivaDueDay} onChange={e => set('ivaDueDay', Number(e.target.value))} className={inputCls} />
           <span className="text-[11px] text-slate-400">Según terminación de CUIT (calendario de ARCA).</span>
         </label>
         <label className="block">
@@ -687,11 +688,11 @@ const SettingsPanel: React.FC<{ settings: TaxSettings; canEdit: boolean; onSave:
             </label>
             <label className="block">
               <span className="text-xs font-bold text-slate-600">Cuota mensual ($)</span>
-              <input disabled={!canEdit} type="number" value={s.monotributoMonthlyFee || 0} onChange={e => set('monotributoMonthlyFee', Number(e.target.value))} className={inputCls} />
+              <NumInput disabled={!canEdit} value={s.monotributoMonthlyFee || 0} onChange={e => set('monotributoMonthlyFee', Number(e.target.value))} className={inputCls} />
             </label>
             <label className="block">
               <span className="text-xs font-bold text-slate-600">Tope anual de facturación ($)</span>
-              <input disabled={!canEdit} type="number" value={s.monotributoAnnualLimit || 0} onChange={e => set('monotributoAnnualLimit', Number(e.target.value))} className={inputCls} />
+              <NumInput disabled={!canEdit} value={s.monotributoAnnualLimit || 0} onChange={e => set('monotributoAnnualLimit', Number(e.target.value))} className={inputCls} />
             </label>
           </>
         )}
@@ -719,16 +720,16 @@ const SettingsPanel: React.FC<{ settings: TaxSettings; canEdit: boolean; onSave:
         {s.iibbRegime === 'convenio_multilateral' && (
           <label className="block">
             <span className="text-xs font-bold text-slate-600">Coeficiente de la jurisdicción</span>
-            <input disabled={!canEdit} type="number" step="0.0001" min={0} max={1} value={s.iibbCoefficient} onChange={e => set('iibbCoefficient', Number(e.target.value))} className={inputCls} />
+            <NumInput disabled={!canEdit} step="0.0001" min={0} max={1} value={s.iibbCoefficient} onChange={e => set('iibbCoefficient', Number(e.target.value))} className={inputCls} />
           </label>
         )}
         <label className="block">
           <span className="text-xs font-bold text-slate-600">Mínimo mensual ($)</span>
-          <input disabled={!canEdit} type="number" min={0} value={s.iibbMonthlyMinimum} onChange={e => set('iibbMonthlyMinimum', Number(e.target.value))} className={inputCls} />
+          <NumInput disabled={!canEdit} min={0} value={s.iibbMonthlyMinimum} onChange={e => set('iibbMonthlyMinimum', Number(e.target.value))} className={inputCls} />
         </label>
         <label className="block">
           <span className="text-xs font-bold text-slate-600">Día de vencimiento IIBB</span>
-          <input disabled={!canEdit} type="number" min={1} max={31} value={s.iibbDueDay} onChange={e => set('iibbDueDay', Number(e.target.value))} className={inputCls} />
+          <NumInput disabled={!canEdit} min={1} max={31} value={s.iibbDueDay} onChange={e => set('iibbDueDay', Number(e.target.value))} className={inputCls} />
         </label>
         <label className="flex items-center gap-2 text-sm md:col-span-3">
           <input disabled={!canEdit} type="checkbox" checked={s.iibbIncludeNonInvoicedSales} onChange={e => set('iibbIncludeNonInvoicedSales', e.target.checked)} />
@@ -746,11 +747,11 @@ const SettingsPanel: React.FC<{ settings: TaxSettings; canEdit: boolean; onSave:
                 <input disabled={!canEdit} value={a.name} onChange={e => set('iibbActivities', s.iibbActivities.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Actividad" className="flex-1 min-w-[180px] border border-slate-300 rounded-xl px-3 py-2 text-sm" />
                 <input disabled={!canEdit} value={a.code || ''} onChange={e => set('iibbActivities', s.iibbActivities.map((x, j) => (j === i ? { ...x, code: e.target.value } : x)))} placeholder="Código NAES" className="w-32 border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono" />
                 <div className="relative w-28">
-                  <input disabled={!canEdit} type="number" step="0.01" value={a.rate} onChange={e => set('iibbActivities', s.iibbActivities.map((x, j) => (j === i ? { ...x, rate: Number(e.target.value) } : x)))} className="w-full border border-slate-300 rounded-xl pl-3 pr-14 py-2 text-sm font-mono text-right" />
+                  <NumInput disabled={!canEdit} step="0.01" value={a.rate} onChange={e => set('iibbActivities', s.iibbActivities.map((x, j) => (j === i ? { ...x, rate: Number(e.target.value) } : x)))} className="w-full border border-slate-300 rounded-xl pl-3 pr-14 py-2 text-sm font-mono text-right" />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">% alíc.</span>
                 </div>
                 <div className="relative w-28">
-                  <input disabled={!canEdit} type="number" step="0.01" value={a.share} onChange={e => set('iibbActivities', s.iibbActivities.map((x, j) => (j === i ? { ...x, share: Number(e.target.value) } : x)))} className="w-full border border-slate-300 rounded-xl pl-3 pr-14 py-2 text-sm font-mono text-right" />
+                  <NumInput disabled={!canEdit} step="0.01" value={a.share} onChange={e => set('iibbActivities', s.iibbActivities.map((x, j) => (j === i ? { ...x, share: Number(e.target.value) } : x)))} className="w-full border border-slate-300 rounded-xl pl-3 pr-14 py-2 text-sm font-mono text-right" />
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">% vtas.</span>
                 </div>
                 {canEdit && s.iibbActivities.length > 1 && (
@@ -774,15 +775,15 @@ const SettingsPanel: React.FC<{ settings: TaxSettings; canEdit: boolean; onSave:
         </label>
         <label className="block">
           <span className="text-xs font-bold text-slate-600">IVA saldo técnico a favor</span>
-          <input disabled={!canEdit} type="number" value={s.initialIvaTechnicalBalance} onChange={e => set('initialIvaTechnicalBalance', Number(e.target.value))} className={inputCls} />
+          <NumInput disabled={!canEdit} value={s.initialIvaTechnicalBalance} onChange={e => set('initialIvaTechnicalBalance', Number(e.target.value))} className={inputCls} />
         </label>
         <label className="block">
           <span className="text-xs font-bold text-slate-600">IVA saldo libre disponibilidad</span>
-          <input disabled={!canEdit} type="number" value={s.initialIvaFreeBalance} onChange={e => set('initialIvaFreeBalance', Number(e.target.value))} className={inputCls} />
+          <NumInput disabled={!canEdit} value={s.initialIvaFreeBalance} onChange={e => set('initialIvaFreeBalance', Number(e.target.value))} className={inputCls} />
         </label>
         <label className="block">
           <span className="text-xs font-bold text-slate-600">IIBB saldo a favor</span>
-          <input disabled={!canEdit} type="number" value={s.initialIibbBalance} onChange={e => set('initialIibbBalance', Number(e.target.value))} className={inputCls} />
+          <NumInput disabled={!canEdit} value={s.initialIibbBalance} onChange={e => set('initialIibbBalance', Number(e.target.value))} className={inputCls} />
         </label>
         <p className="md:col-span-4 text-[11px] text-slate-400">Copialos de la última declaración jurada presentada antes del período inicial.</p>
       </section>
@@ -954,7 +955,7 @@ const VepModal: React.FC<{
                   </label>
                   <label className="block">
                     <span className="text-xs font-bold text-slate-600">Importe pagado</span>
-                    <input type="number" step="0.01" value={paidAmount} onChange={e => setPaidAmount(Number(e.target.value))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono" />
+                    <NumInput step="0.01" value={paidAmount} onChange={e => setPaidAmount(Number(e.target.value))} className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono" />
                   </label>
                   <label className="block">
                     <span className="text-xs font-bold text-slate-600">Forma</span>

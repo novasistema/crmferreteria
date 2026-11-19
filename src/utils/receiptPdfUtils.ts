@@ -119,10 +119,13 @@ export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: 
     transferencia: 'Transferencia Bancaria',
     echeq: 'E-Cheq',
     cheque: 'Cheque Físico',
-    efectivo: 'Efectivo en Mostrador'
+    efectivo: 'Efectivo en Mostrador',
+    tarjeta: 'Tarjeta',
+    mercadopago: 'Mercado Pago'
   }[receipt.paymentMethod] || receipt.paymentMethod;
+  const multiMethod = !!receipt.bankOrCheckInfo && receipt.bankOrCheckInfo.includes(' + ');
 
-  doc.text(methodLabel, 120, 105);
+  doc.text(multiMethod ? 'Varios (ver detalle)' : methodLabel, 120, 105);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
@@ -133,7 +136,7 @@ export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: 
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Referencia / Banco: ${receipt.bankOrCheckInfo}`, 18, 112);
+    doc.text(doc.splitTextToSize(`${multiMethod ? 'Detalle del pago' : 'Referencia / Banco'}: ${receipt.bankOrCheckInfo}`, 175).slice(0, 2), 18, 112);
   }
 
   // Allocated orders
@@ -141,7 +144,7 @@ export function generatePaymentReceiptPDF(receipt: PaymentReceiptData, config?: 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(`Imputado a los pedidos: ${receipt.allocatedOrderNumbers.join(', ')}`, 18, 118);
+    doc.text(doc.splitTextToSize(`Imputado a: ${receipt.allocatedOrderNumbers.join(', ')}`, 175).slice(0, 2), 18, 121);
   }
 
   // 6. Current Account Balance Summary Box

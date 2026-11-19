@@ -33,6 +33,18 @@ import {
 import { Customer, SalesOrder, FinancialTransaction, CompanyConfig, Transport } from '../types';
 import { generatePaymentReminderWhatsApp } from '../utils/exportUtils';
 import { generatePaymentReceiptPDF, buildWhatsAppReceiptMessage, PaymentReceiptData } from '../utils/receiptPdfUtils';
+import { NumInput } from './NumInput';
+import { ReceiptPaymentsPanel, PayableDoc, PaymentLine, DocAllocation, allocatePayment, newPaymentLine, linesSummary } from './ReceiptPaymentsPanel';
+
+const CUSTOMER_PAYMENT_METHODS = [
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'echeq', label: 'E-Cheq' },
+  { value: 'cheque', label: 'Cheque' },
+  { value: 'tarjeta', label: 'Tarjeta' },
+  { value: 'mercadopago', label: 'Mercado Pago' }
+];
+const METHOD_LABELS: Record<string, string> = Object.fromEntries(CUSTOMER_PAYMENT_METHODS.map(m => [m.value, m.label]));
 
 interface CustomersModuleProps {
   customers: Customer[];
@@ -51,6 +63,7 @@ interface CustomersModuleProps {
     allocatedOrderIds?: string[]
   ) => Promise<void>;
   preselectedCustomer?: Customer | null;
+  onRecordReceipt?: (customerId: string, lines: PaymentLine[], concept: string, receiptNumber: string, allocations: DocAllocation[]) => Promise<void>;
 }
 
 export const CustomersModule: React.FC<CustomersModuleProps> = ({
@@ -61,7 +74,8 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
   config,
   onSaveCustomer,
   onRecordPayment,
-  preselectedCustomer = null
+  preselectedCustomer = null,
+  onRecordReceipt
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(preselectedCustomer);
@@ -90,12 +104,11 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
   });
 
   // Payment Receipt form state
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([newPaymentLine('transferencia')]);
+  const paymentAmount = paymentLines.reduce((a, l) => a + (Number(l.amount) || 0), 0);
   const [paymentReceiptNumber, setPaymentReceiptNumber] = useState('');
   const [paymentDate, setPaymentDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState<FinancialTransaction['paymentMethod']>('transferencia');
   const [paymentConcept, setPaymentConcept] = useState('Cancelación parcial factura / cuenta corriente');
-  const [paymentBankInfo, setPaymentBankInfo] = useState('');
   const [selectedOrderIdsToPay, setSelectedOrderIdsToPay] = useState<string[]>([]);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
@@ -120,6 +133,22 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
       o.customerTaxId === currentCustomerData.taxId
     );
   }, [currentCustomerData, salesOrders]);
+
+  // Facturas con saldo pendiente (las anuladas no cuentan)
+  const payableDocs = useMemo<PayableDoc[]>(
+    () =>
+      customerOrders
+        .filter(o => o.paymentStatus !== 'pagado' && !o.cancelledAt && (o.total || 0) > (o.paidAmount || 0))
+        .map(o => ({
+          id: o.id,
+          number: o.invoiceNumber || o.orderNumber,
+          date: o.date,
+          total: o.total,
+          paid: o.paidAmount || 0,
+          label: o.billingType === 'arca' ? (o.invoiceType || 'Factura') : 'Sin factura'
+        })),
+    [customerOrders]
+  );
 
   // Customer payment transactions (Credits)
   const customerPayments = useMemo(() => {
@@ -205,11 +234,9 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
     if (!currentCustomerData) return;
     const autoRecNumber = `REC-0001-${String(Math.floor(Math.random() * 89999 + 10000)).padStart(8, '0')}`;
     setPaymentReceiptNumber(autoRecNumber);
-    setPaymentAmount(currentCustomerData.currentBalance > 0 ? currentCustomerData.currentBalance : 0);
+    setPaymentLines([newPaymentLine('transferencia', currentCustomerData.currentBalance > 0 ? currentCustomerData.currentBalance : 0)]);
     setPaymentDate(new Date().toISOString().split('T')[0]);
-    setPaymentMethod('transferencia');
     setPaymentConcept(`Cobranza / Cancelación cuenta corriente ${currentCustomerData.businessName}`);
-    setPaymentBankInfo('');
     setSelectedOrderIdsToPay([]);
     setShowPaymentModal(true);
   };
@@ -251,29 +278,32 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
       const prevBal = currentCustomerData.currentBalance;
       const newBal = Math.max(0, prevBal - paymentAmount);
 
-      await onRecordPayment(
-        currentCustomerData.id, 
-        paymentAmount, 
-        paymentMethod, 
-        paymentConcept,
-        recNumber,
-        paymentBankInfo,
-        selectedOrderIdsToPay
-      );
+      const lines = paymentLines.filter(l => (Number(l.amount) || 0) > 0);
+      const allocations = allocatePayment(payableDocs, selectedOrderIdsToPay, paymentAmount);
+      if (onRecordReceipt) {
+        await onRecordReceipt(currentCustomerData.id, lines, paymentConcept, recNumber, allocations);
+      } else {
+        for (const l of lines) {
+          await onRecordPayment(currentCustomerData.id, l.amount, l.method as FinancialTransaction['paymentMethod'], paymentConcept, recNumber, l.reference, []);
+        }
+      }
 
       // Prepare receipt data for printing / downloading
       const allocatedOrders = customerOrders
-        .filter(o => selectedOrderIdsToPay.includes(o.id))
-        .map(o => o.orderNumber);
+        .filter(o => allocations.some(a => a.id === o.id))
+        .map(o => {
+          const a = allocations.find(x => x.id === o.id)!;
+          return a.status === 'pagado' ? o.orderNumber : `${o.orderNumber} (pago parcial)`;
+        });
 
       const receiptData: PaymentReceiptData = {
         receiptNumber: recNumber,
         date: paymentDate,
         customer: currentCustomerData,
         amount: paymentAmount,
-        paymentMethod,
+        paymentMethod: (lines[0]?.method || 'transferencia') as FinancialTransaction['paymentMethod'],
         concept: paymentConcept,
-        bankOrCheckInfo: paymentBankInfo,
+        bankOrCheckInfo: linesSummary(lines, METHOD_LABELS),
         previousBalance: prevBal,
         newBalance: newBal,
         allocatedOrderNumbers: allocatedOrders.length > 0 ? allocatedOrders : undefined
@@ -286,24 +316,6 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
     } finally {
       setIsSubmittingPayment(false);
     }
-  };
-
-  // Toggle order allocation in payment modal
-  const toggleOrderToPay = (order: SalesOrder) => {
-    setSelectedOrderIdsToPay(prev => {
-      const exists = prev.includes(order.id);
-      if (exists) {
-        return prev.filter(id => id !== order.id);
-      } else {
-        const next = [...prev, order.id];
-        // Automatically suggest paying sum of selected orders
-        const sum = customerOrders
-          .filter(o => next.includes(o.id))
-          .reduce((acc, o) => acc + o.total, 0);
-        setPaymentAmount(sum);
-        return next;
-      }
-    });
   };
 
   return (
@@ -773,14 +785,14 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setPaymentAmount(currentCustomerData.currentBalance)}
+                  onClick={() => setPaymentLines(prev => [{ ...prev[0], amount: currentCustomerData.currentBalance }, ...prev.slice(1)])}
                   className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-2.5 py-1 rounded-lg text-[11px]"
                 >
                   Total Deuda (100%)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaymentAmount(Math.round(currentCustomerData.currentBalance / 2))}
+                  onClick={() => setPaymentLines(prev => [{ ...prev[0], amount: Math.round(currentCustomerData.currentBalance / 2) }, ...prev.slice(1)])}
                   className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded-lg text-[11px]"
                 >
                   50%
@@ -817,53 +829,6 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
                 </div>
               </div>
 
-              {/* Amount & Method */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Importe Recibido ($)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="0.01"
-                    value={paymentAmount}
-                    onChange={e => setPaymentAmount(Number(e.target.value))}
-                    className="w-full text-base p-2 rounded-xl border border-emerald-400 font-mono font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Medio de Cobro
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={e => setPaymentMethod(e.target.value as any)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-semibold"
-                  >
-                    <option value="transferencia">Transferencia Bancaria</option>
-                    <option value="echeq">E-Cheq</option>
-                    <option value="cheque">Cheque Físico</option>
-                    <option value="efectivo">Efectivo en Mostrador</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Bank or Check Ref */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Banco / Nro de Cheque o Transferencia / Comprobante
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Banco Galicia Transf #99482 / Cheque #884920 Vto 20/09"
-                  value={paymentBankInfo}
-                  onChange={e => setPaymentBankInfo(e.target.value)}
-                  className="w-full text-xs p-2 rounded-xl border border-slate-300"
-                />
-              </div>
-
               {/* Concept */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
@@ -878,36 +843,17 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
                 />
               </div>
 
-              {/* Pending Orders Allocation Selection */}
-              {customerOrders.filter(o => o.paymentStatus !== 'pagado').length > 0 && (
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Imputar a Pedidos Pendientes (Opcional):
-                  </label>
-                  <div className="max-h-28 overflow-y-auto space-y-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                    {customerOrders.filter(o => o.paymentStatus !== 'pagado').map(order => (
-                      <label 
-                        key={order.id} 
-                        className="flex items-center justify-between p-1.5 bg-white rounded-lg border border-slate-200 cursor-pointer hover:bg-purple-50/50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedOrderIdsToPay.includes(order.id)}
-                            onChange={() => toggleOrderToPay(order)}
-                            className="rounded text-purple-600"
-                          />
-                          <span className="font-mono font-bold text-slate-800">{order.orderNumber}</span>
-                          <span className="text-[10px] text-slate-400">({order.billingType.toUpperCase()})</span>
-                        </div>
-                        <span className="font-mono font-black text-slate-900">
-                          $ {order.total.toLocaleString('es-AR')}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Facturas a cancelar y formas de pago */}
+              <ReceiptPaymentsPanel
+                docs={payableDocs}
+                accountBalance={currentCustomerData.currentBalance}
+                selectedIds={selectedOrderIdsToPay}
+                onSelectedIdsChange={setSelectedOrderIdsToPay}
+                lines={paymentLines}
+                onLinesChange={setPaymentLines}
+                methods={CUSTOMER_PAYMENT_METHODS}
+                docsTitle="Facturas pendientes del cliente"
+              />
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1160,8 +1106,7 @@ export const CustomersModule: React.FC<CustomersModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                     Límite de Crédito ($)
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={customerForm.creditLimit}
                     onChange={e => setCustomerForm({ ...customerForm, creditLimit: Number(e.target.value) })}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-mono font-bold"

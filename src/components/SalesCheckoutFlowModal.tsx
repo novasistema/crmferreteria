@@ -18,6 +18,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { Customer, Cashbox, InvoiceType } from '../types';
+import { NumInput } from './NumInput';
 
 export type CheckoutDocumentType = 'ingreso_venta' | 'factura_a' | 'factura_b' | 'factura_c';
 
@@ -601,8 +602,7 @@ export const SalesCheckoutFlowModal: React.FC<SalesCheckoutFlowModalProps> = ({
                     Paga con Efectivo ($):
                   </label>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="number"
+                    <NumInput
                       step="0.01"
                       value={cashAmountGiven}
                       onChange={(e) => setCashAmountGiven(Number(e.target.value) || 0)}
@@ -671,8 +671,7 @@ export const SalesCheckoutFlowModal: React.FC<SalesCheckoutFlowModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">Efectivo ($)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       step="0.01"
                       value={mixedCash}
                       onChange={(e) => {
@@ -686,8 +685,7 @@ export const SalesCheckoutFlowModal: React.FC<SalesCheckoutFlowModalProps> = ({
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">Transferencia / Tarjeta ($)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       step="0.01"
                       value={mixedTransfer}
                       onChange={(e) => setMixedTransfer(Number(e.target.value) || 0)}

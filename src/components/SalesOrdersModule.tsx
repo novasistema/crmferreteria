@@ -56,6 +56,7 @@ import { generateWhatsAppMessage } from '../utils/exportUtils';
 import { generateQuotePDF, generateRemitoPDF } from '../utils/quoteAndDeliveryPdfUtils';
 import { SalesPointOfSaleTerminal } from './SalesPointOfSaleTerminal';
 import { QuotesModule } from './QuotesModule';
+import { NumInput } from './NumInput';
 
 interface SalesOrdersModuleProps {
   salesOrders: SalesOrder[];
@@ -1100,8 +1101,7 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
 
                           <div className="flex items-center gap-1">
                             <span className="text-[11px] text-slate-500 font-semibold">Cant:</span>
-                            <input
-                              type="number"
+                            <NumInput
                               min="1"
                               value={item.quantity}
                               onChange={e => {
@@ -1565,8 +1565,7 @@ export const SalesOrdersModule: React.FC<SalesOrdersModuleProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <input
-                            type="number"
+                          <NumInput
                             min="0"
                             max={pending}
                             value={dispatchItems[it.productId] ?? 0}

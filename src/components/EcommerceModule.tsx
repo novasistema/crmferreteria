@@ -30,6 +30,7 @@ import {
   callMercadoPago,
   whatsappLink
 } from '../services/ecommerce';
+import { NumInput } from './NumInput';
 
 interface EcommerceModuleProps {
   config: CompanyConfig | null;
@@ -513,7 +514,7 @@ const SettingsPanel: React.FC<{ settings: EcommerceSettings; canEdit: boolean; o
             <option value="minorista">Minorista</option><option value="mayorista">Mayorista</option><option value="distribuidor">Distribuidor</option>
           </select>
         </label>
-        <label className="block"><span className="text-xs font-bold text-slate-600">Compra mínima ($)</span><input disabled={!canEdit} type="number" min={0} value={s.minOrderAmount} onChange={e => set('minOrderAmount', Number(e.target.value))} className={inputCls} /></label>
+        <label className="block"><span className="text-xs font-bold text-slate-600">Compra mínima ($)</span><NumInput disabled={!canEdit} min={0} value={s.minOrderAmount} onChange={e => set('minOrderAmount', Number(e.target.value))} className={inputCls} /></label>
         <div className="space-y-2 pt-5">
           {check('showPricesWithIva', 'Mostrar precios con IVA incluido')}
           {check('showStock', 'Mostrar disponibilidad')}
@@ -527,8 +528,8 @@ const SettingsPanel: React.FC<{ settings: EcommerceSettings; canEdit: boolean; o
         <label className="block md:col-span-2"><span className="text-xs font-bold text-slate-600">Dirección de retiro</span><input disabled={!canEdit} value={s.pickupAddress || ''} onChange={e => set('pickupAddress', e.target.value)} className={inputCls} /></label>
         {s.shippingEnabled && (
           <>
-            <label className="block"><span className="text-xs font-bold text-slate-600">Costo de envío ($, 0 = a coordinar)</span><input disabled={!canEdit} type="number" min={0} value={s.shippingCost} onChange={e => set('shippingCost', Number(e.target.value))} className={inputCls} /></label>
-            <label className="block"><span className="text-xs font-bold text-slate-600">Envío gratis desde ($, 0 = nunca)</span><input disabled={!canEdit} type="number" min={0} value={s.freeShippingFrom} onChange={e => set('freeShippingFrom', Number(e.target.value))} className={inputCls} /></label>
+            <label className="block"><span className="text-xs font-bold text-slate-600">Costo de envío ($, 0 = a coordinar)</span><NumInput disabled={!canEdit} min={0} value={s.shippingCost} onChange={e => set('shippingCost', Number(e.target.value))} className={inputCls} /></label>
+            <label className="block"><span className="text-xs font-bold text-slate-600">Envío gratis desde ($, 0 = nunca)</span><NumInput disabled={!canEdit} min={0} value={s.freeShippingFrom} onChange={e => set('freeShippingFrom', Number(e.target.value))} className={inputCls} /></label>
             <label className="block"><span className="text-xs font-bold text-slate-600">Aclaración (zonas, demoras)</span><input disabled={!canEdit} value={s.shippingNote || ''} onChange={e => set('shippingNote', e.target.value)} className={inputCls} /></label>
           </>
         )}

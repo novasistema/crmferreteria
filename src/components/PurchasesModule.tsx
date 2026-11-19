@@ -27,7 +27,16 @@ import {
   Filter,
   Printer
 } from 'lucide-react';
-import { Supplier, PurchaseOrder, RawMaterial, FinancialTransaction, Cashbox, CheckItem, CompanyConfig } from '../types';
+import { Supplier, PurchaseOrder, RawMaterial, FinancialTransaction, Cashbox, CheckItem, CompanyConfig, PurchaseInvoice } from '../types';
+import { NumInput } from './NumInput';
+import { ReceiptPaymentsPanel, PayableDoc, PaymentLine, DocAllocation, allocatePayment, newPaymentLine } from './ReceiptPaymentsPanel';
+
+const SUPPLIER_PAYMENT_METHODS = [
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'echeq', label: 'E-Cheq' },
+  { value: 'cheque', label: 'Cheque' }
+];
 
 interface PurchasesModuleProps {
   suppliers: Supplier[];
@@ -41,6 +50,8 @@ interface PurchasesModuleProps {
   onCreatePurchaseOrder: (po: PurchaseOrder) => Promise<void>;
   onReceivePurchaseOrder: (po: PurchaseOrder) => Promise<void>;
   onRecordSupplierPayment?: (supplierId: string, amount: number, cashboxId: string, notes: string) => Promise<void>;
+  purchaseInvoices?: PurchaseInvoice[];
+  onRecordSupplierReceipt?: (supplierId: string, lines: PaymentLine[], notes: string, allocations: (DocAllocation & { kind: 'pi' | 'po' })[]) => Promise<void>;
 }
 
 export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
@@ -54,7 +65,9 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
   onSaveSupplier,
   onCreatePurchaseOrder,
   onReceivePurchaseOrder,
-  onRecordSupplierPayment
+  onRecordSupplierPayment,
+  purchaseInvoices = [],
+  onRecordSupplierReceipt
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'suppliers'>('suppliers');
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
@@ -84,9 +97,9 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
   const [editingDiscountConcept, setEditingDiscountConcept] = useState<string>('');
 
   // Payment to supplier state
-  const [payAmount, setPayAmount] = useState<number>(0);
-  const [payCashboxId, setPayCashboxId] = useState<string>(cashboxes[0]?.id || 'box-planta');
-  const [payMethod, setPayMethod] = useState<'efectivo' | 'transferencia' | 'cheque'>('transferencia');
+  const [payLines, setPayLines] = useState<PaymentLine[]>([newPaymentLine('transferencia')]);
+  const [payDocIds, setPayDocIds] = useState<string[]>([]);
+  const payAmount = payLines.reduce((a, l) => a + (Number(l.amount) || 0), 0);
   const [payNotes, setPayNotes] = useState<string>('');
   const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
@@ -180,6 +193,23 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
       });
     });
 
+    // 1b. Facturas de compra cargadas a cuenta corriente
+    purchaseInvoices
+      .filter(pi => pi.supplierId === currentSupplier.id && pi.paymentMethod === 'Cuenta Corriente')
+      .forEach(pi => {
+        movements.push({
+          id: `pi-${pi.id}`,
+          date: pi.date,
+          type: 'compra',
+          typeLabel: `Factura de compra ${pi.invoiceType || ''}`.trim(),
+          docNumber: pi.fullNumber,
+          concept: `${pi.items.length} artículos`,
+          debit: pi.total,
+          credit: 0,
+          runningBalance: 0
+        });
+      });
+
     // 2. Payments recorded for this supplier from financialTransactions
     const supplierTxs = financialTransactions.filter(tx => 
       tx.type === 'pago_proveedor' && (
@@ -234,10 +264,22 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
 
     // Return in reverse chronological order (newest first)
     return movements.reverse();
-  }, [currentSupplier, purchaseOrders, financialTransactions, checks]);
+  }, [currentSupplier, purchaseOrders, purchaseInvoices, financialTransactions, checks]);
 
   // Total balance calculated from ledger
   const computedBalance = supplierLedger.length > 0 ? supplierLedger[0].runningBalance : (currentSupplier?.currentBalance || 0);
+
+  // Comprobantes del proveedor con saldo pendiente: facturas en cuenta corriente y órdenes de compra recibidas
+  const supplierDocs = useMemo<(PayableDoc & { kind: 'pi' | 'po' })[]>(() => {
+    if (!currentSupplier) return [];
+    const pis = purchaseInvoices
+      .filter(pi => pi.supplierId === currentSupplier.id && pi.paymentMethod === 'Cuenta Corriente')
+      .map(pi => ({ id: pi.id, kind: 'pi' as const, number: pi.fullNumber, date: pi.date, total: pi.total, paid: pi.paidAmount || 0, label: `Factura ${pi.invoiceType || ''}`.trim() }));
+    const pos = purchaseOrders
+      .filter(po => po.supplierId === currentSupplier.id && po.status !== 'cancelado' && po.status !== 'borrador')
+      .map(po => ({ id: po.id, kind: 'po' as const, number: po.orderNumber, date: po.date, total: po.total, paid: po.paidAmount || 0, label: 'Orden de compra' }));
+    return [...pis, ...pos].filter(d => d.total - d.paid > 0.009).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [currentSupplier, purchaseInvoices, purchaseOrders]);
 
   // Total purchases and total payments
   const totalPurchased = supplierLedger.filter(m => m.type === 'compra').reduce((acc, m) => acc + m.debit, 0);
@@ -309,14 +351,20 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
   const handleRecordPaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentSupplier || payAmount <= 0) return;
-    if (!onRecordSupplierPayment) return;
+    if (!onRecordSupplierPayment && !onRecordSupplierReceipt) return;
 
     setIsSubmittingPay(true);
     try {
-      const notes = payNotes || `Pago ${payMethod.toUpperCase()} a ${currentSupplier.businessName}`;
-      await onRecordSupplierPayment(currentSupplier.id, payAmount, payCashboxId, notes);
+      const lines = payLines.filter(l => (Number(l.amount) || 0) > 0).map(l => ({ ...l, cashboxId: l.cashboxId || cashboxes[0]?.id }));
+      const allocations = allocatePayment(supplierDocs, payDocIds, payAmount);
+      const docNames = supplierDocs.filter(d => allocations.some(a => a.id === d.id)).map(d => d.number).join(', ');
+      const notes = payNotes || `Pago a ${currentSupplier.businessName}${docNames ? ` · ${docNames}` : ''}`;
+      if (onRecordSupplierReceipt) {
+        await onRecordSupplierReceipt(currentSupplier.id, lines, notes, allocations.map(a => ({ ...a, kind: supplierDocs.find(d => d.id === a.id)?.kind || 'pi' })));
+      } else {
+        for (const l of lines) await onRecordSupplierPayment?.(currentSupplier.id, l.amount, l.cashboxId || '', `${notes}${l.reference ? ` · ${l.reference}` : ''}`);
+      }
       setShowPayModal(false);
-      setPayAmount(0);
       setPayNotes('');
     } catch (err) {
       console.error('Error recording supplier payment:', err);
@@ -485,7 +533,9 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
                 </button>
                 <button
                   onClick={() => {
-                    setPayAmount(Math.max(0, computedBalance));
+                    setPayLines([{ ...newPaymentLine('transferencia', Math.max(0, computedBalance)), cashboxId: (cashboxes.find(b => b.type === 'banco') || cashboxes[0])?.id }]);
+                    setPayDocIds([]);
+                    setPayNotes('');
                     setShowPayModal(true);
                   }}
                   className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-colors"
@@ -859,8 +909,7 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
                   Porcentaje de Descuento Acordado (%)
                 </label>
                 <div className="relative">
-                  <input
-                    type="number"
+                  <NumInput
                     min="0"
                     max="100"
                     step="0.5"
@@ -927,7 +976,7 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
       {/* ======================================================== */}
       {showPayModal && currentSupplier && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
@@ -946,81 +995,27 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
             </div>
 
             <form onSubmit={handleRecordPaySubmit} className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Monto a Pagar (ARS)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 font-bold text-slate-400">$</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={payAmount}
-                    onChange={e => setPayAmount(Number(e.target.value))}
-                    className="w-full text-base font-mono font-bold pl-8 pr-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    required
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
-                  <span>Deuda actual: <strong>${computedBalance.toLocaleString('es-AR')}</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => setPayAmount(Math.max(0, computedBalance))}
-                    className="text-emerald-700 font-bold hover:underline"
-                  >
-                    Pagar Saldo Total
-                  </button>
-                </div>
-              </div>
+              <ReceiptPaymentsPanel
+                docs={supplierDocs}
+                accountBalance={computedBalance}
+                selectedIds={payDocIds}
+                onSelectedIdsChange={setPayDocIds}
+                lines={payLines}
+                onLinesChange={setPayLines}
+                methods={SUPPLIER_PAYMENT_METHODS}
+                cashboxes={cashboxes.map(b => ({ id: b.id, name: b.name }))}
+                docsTitle="Facturas pendientes del proveedor"
+              />
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Caja o Cuenta Origen
-                </label>
-                <select
-                  value={payCashboxId}
-                  onChange={e => setPayCashboxId(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-medium"
-                >
-                  {cashboxes.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} (Saldo: ${b.currentBalance.toLocaleString('es-AR')})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Medio de Pago
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['transferencia', 'efectivo', 'cheque'] as const).map(method => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setPayMethod(method)}
-                      className={`py-2 text-xs font-bold uppercase rounded-xl border transition-all ${
-                        payMethod === method
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {method}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Notas / Nro. Comprobante / CBU
+                  Notas (opcional)
                 </label>
                 <input
                   type="text"
                   value={payNotes}
                   onChange={e => setPayNotes(e.target.value)}
-                  placeholder="Ej: Transf. Galicia #9812 - Pago factura de resina"
+                  placeholder="Ej: pago acordado con el vendedor"
                   className="w-full text-xs p-2 rounded-xl border border-slate-300"
                 />
               </div>
@@ -1120,8 +1115,7 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
                           <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>
                         ))}
                       </select>
-                      <input
-                        type="number"
+                      <NumInput
                         min="1"
                         value={it.quantity}
                         onChange={e => {
@@ -1132,8 +1126,7 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
                         className="w-20 text-xs p-1.5 rounded-lg border border-slate-300 font-mono font-bold text-right"
                         placeholder="Cant."
                       />
-                      <input
-                        type="number"
+                      <NumInput
                         min="1"
                         value={it.unitCost}
                         onChange={e => {
@@ -1291,8 +1284,7 @@ export const PurchasesModule: React.FC<PurchasesModuleProps> = ({
                   <div className="col-span-1">
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">% Descuento</label>
                     <div className="relative">
-                      <input
-                        type="number"
+                      <NumInput
                         min="0"
                         max="100"
                         value={supplierForm.discountPercentage || 0}

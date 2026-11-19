@@ -44,6 +44,7 @@ import {
   FormulaItem
 } from '../types';
 import { brandName, legalName, brandLogo } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface ProductionModuleProps {
   rawMaterials: RawMaterial[];
@@ -1016,8 +1017,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                     Masa a Producir (Kilogramos)
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="100"
                     step="50"
                     value={orderForm.targetKg}
@@ -1174,8 +1174,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Viscosidad (Krebs KU)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={orderForm.viscosityKU}
                       onChange={e => setOrderForm({ ...orderForm, viscosityKU: Number(e.target.value) })}
                       className="w-full text-xs p-2 rounded-xl border border-slate-300 font-mono font-bold bg-white text-center"
@@ -1183,8 +1182,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">pH Medido</label>
-                    <input
-                      type="number"
+                    <NumInput
                       step="0.1"
                       value={orderForm.ph}
                       onChange={e => setOrderForm({ ...orderForm, ph: Number(e.target.value) })}
@@ -1193,8 +1191,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Densidad Real (kg/L)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       step="0.01"
                       value={orderForm.densityReal}
                       onChange={e => setOrderForm({ ...orderForm, densityReal: Number(e.target.value) })}
@@ -1684,8 +1681,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Stock Actual</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={materialForm.currentStock ?? 0}
                     onChange={e => setMaterialForm({ ...materialForm, currentStock: Number(e.target.value) })}
                     className="w-full text-xs p-2 rounded-xl border border-slate-300 font-mono font-bold"
@@ -1693,8 +1689,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Stock Mínimo</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={materialForm.minStock ?? 0}
                     onChange={e => setMaterialForm({ ...materialForm, minStock: Number(e.target.value) })}
                     className="w-full text-xs p-2 rounded-xl border border-slate-300 font-mono"
@@ -1705,8 +1700,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Costo Unitario ($)</label>
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={materialForm.unitCost ?? 0}
                     onChange={e => setMaterialForm({ ...materialForm, unitCost: Number(e.target.value) })}
@@ -1804,8 +1798,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Densidad (kg/L)</label>
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={formulaForm.density}
                     onChange={e => setFormulaForm({ ...formulaForm, density: Number(e.target.value) })}
@@ -1845,8 +1838,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({
                         ))}
                       </select>
                       <div className="flex items-center gap-1">
-                        <input
-                          type="number"
+                        <NumInput
                           step="0.1"
                           min="0.1"
                           max="100"

@@ -9,6 +9,7 @@ import {
 import { BarcodeScanner } from './BarcodeScanner';
 import { parseVoiceExpense } from '../utils/voiceExpense';
 import { subscribeSync, SyncSnapshot } from '../services/offlineSync';
+import { parseArNumber } from './NumInput';
 
 type View = 'menu' | MobileModuleId | 'settings';
 
@@ -208,7 +209,7 @@ export const MobileModeApp: React.FC<Props> = props => {
   };
 
   const saveExpense = async () => {
-    const amount = Number(String(expAmount).replace(/\./g, '').replace(',', '.'));
+    const amount = (parseArNumber(String(expAmount)) ?? NaN);
     const box = arsBoxes.find(b => b.id === (expBox || defaultBox?.id));
     if (!(amount > 0)) return setToast({ ok: false, text: 'Ingresá un importe mayor a cero.' });
     if (!expCat) return setToast({ ok: false, text: 'Elegí una categoría.' });
@@ -240,7 +241,7 @@ export const MobileModeApp: React.FC<Props> = props => {
   const [payKind, setPayKind] = useState<'efectivo' | 'transferencia' | 'cheque' | 'echeq'>('efectivo');
 
   const registerPayment = async (c: Customer) => {
-    const amount = Number(String(payAmount).replace(/\./g, '').replace(',', '.'));
+    const amount = (parseArNumber(String(payAmount)) ?? NaN);
     if (!(amount > 0)) return setToast({ ok: false, text: 'Ingresá el importe cobrado.' });
     setBusy(true);
     try {

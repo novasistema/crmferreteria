@@ -11,6 +11,7 @@ import {
   BadgePercent,
   ListOrdered
 } from 'lucide-react';
+import { NumInput } from '../NumInput';
 
 interface PriceListRecord {
   id: string;
@@ -310,8 +311,7 @@ export const ListasPreciosModule: React.FC = () => {
               <div>
                 <label className="block font-bold text-slate-800 mb-1">Ajuste de Precio (%)</label>
                 <div className="relative">
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={adjustmentPercent}
                     onChange={(e) => setAdjustmentPercent(parseFloat(e.target.value) || 0)}

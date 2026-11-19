@@ -48,6 +48,7 @@ import {
   PriceListType
 } from '../types';
 import { brandName, brandLogo } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface MobileSellerAppProps {
   sellers: Seller[];
@@ -1070,8 +1071,7 @@ export const MobileSellerApp: React.FC<MobileSellerAppProps> = ({
                                 </button>
                               )}
 
-                              <input
-                                type="number"
+                              <NumInput
                                 min="0"
                                 value={qty || ''}
                                 placeholder="0"
@@ -1516,8 +1516,7 @@ export const MobileSellerApp: React.FC<MobileSellerAppProps> = ({
                     <label className="text-xs font-bold text-slate-700 block mb-1">
                       Monto a Cobrar ($ ARS):
                     </label>
-                    <input
-                      type="number"
+                    <NumInput
                       step="any"
                       min="1"
                       required

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Employee, SalaryPayment, EmployeeSector, SalaryPaymentType, Cashbox, CompanyConfig } from '../types';
 import { generateSalaryDuplicateReceiptPDF, buildWhatsAppSalaryMessage } from '../utils/salaryReceiptPdfUtils';
+import { NumInput } from './NumInput';
 
 interface EmployeesModuleProps {
   employees: Employee[];
@@ -726,8 +727,7 @@ export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
                     <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
                       {isAdvanceMode ? 'Importe Adelanto ($)' : 'Sueldo Básico ($)'}
                     </label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={baseAmount}
                       onChange={e => setBaseAmount(Number(e.target.value))}
                       className="w-full text-sm p-2 rounded-lg border border-slate-300 font-mono font-bold"
@@ -740,8 +740,7 @@ export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
                       <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
                         Presentismo / Bono ($)
                       </label>
-                      <input
-                        type="number"
+                      <NumInput
                         value={presenteeismBonus}
                         onChange={e => setPresenteeismBonus(Number(e.target.value))}
                         className="w-full text-sm p-2 rounded-lg border border-slate-300 font-mono font-bold text-emerald-700"
@@ -756,8 +755,7 @@ export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
                       <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
                         Horas Extras / Adicionales ($)
                       </label>
-                      <input
-                        type="number"
+                      <NumInput
                         value={overtimeAmount}
                         onChange={e => setOvertimeAmount(Number(e.target.value))}
                         className="w-full text-sm p-2 rounded-lg border border-slate-300 font-mono font-bold"
@@ -768,8 +766,7 @@ export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
                       <label className="block text-[10px] font-bold text-red-600 uppercase mb-1">
                         Descuento Adelantos Previos ($)
                       </label>
-                      <input
-                        type="number"
+                      <NumInput
                         value={advanceDeductions}
                         onChange={e => setAdvanceDeductions(Number(e.target.value))}
                         className="w-full text-sm p-2 rounded-lg border border-red-300 font-mono font-bold text-red-600"
@@ -914,8 +911,7 @@ export const EmployeesModule: React.FC<EmployeesModuleProps> = ({
                 <p className="text-[11px] text-rose-800 mb-2">
                   Monto base pactado que se utilizará como referencia automática para el pago de haberes y cálculo de adelantos.
                 </p>
-                <input
-                  type="number"
+                <NumInput
                   min="1"
                   step="0.01"
                   value={employeeForm.baseSalary}

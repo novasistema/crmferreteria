@@ -137,6 +137,7 @@ import { ActualizacionPreciosModule } from './components/products/ActualizacionP
 import { TransferenciasModule } from './components/products/TransferenciasModule';
 import { PedidosSucursalModule } from './components/products/PedidosSucursalModule';
 import { brandName, legalName, brandLogo, setBrandConfig, isLegacyDemoBrand, DEFAULT_BRAND_NAME, DEFAULT_LOGO } from './utils/brand';
+import type { PaymentLine, DocAllocation } from './components/ReceiptPaymentsPanel';
 
 // Fecha local (Argentina) en formato AAAA-MM-DD: toISOString() usa UTC y después de las 21 hs marca el día siguiente
 const loyaltyToday = () => {
@@ -1109,6 +1110,48 @@ export default function App() {
     }
   };
 
+  // Recibo de cliente con una o más formas de pago, imputado a facturas (pago total o parcial)
+  const handleRecordCustomerReceipt = async (
+    customerId: string,
+    lines: PaymentLine[],
+    concept: string,
+    receiptNumber: string,
+    allocations: DocAllocation[]
+  ) => {
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+    const valid = lines.filter(l => (Number(l.amount) || 0) > 0);
+    const total = Math.round(valid.reduce((a, l) => a + Number(l.amount), 0) * 100) / 100;
+    if (total <= 0) return;
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'customers', customerId), { currentBalance: increment(-total) });
+      const now = new Date().toISOString();
+      valid.forEach((l, i) => {
+        const txId = `tx-${Date.now()}-${i}`;
+        batch.set(doc(db, 'financial_transactions', txId), {
+          id: txId,
+          type: 'cobro_cliente',
+          direction: 'ingreso',
+          amount: Number(l.amount),
+          date: now,
+          entityId: customerId,
+          entityName: customer.businessName,
+          paymentMethod: l.method,
+          concept: valid.length > 1 ? `${concept} (${i + 1}/${valid.length})` : concept,
+          receiptNumber,
+          notes: l.reference || ''
+        });
+      });
+      allocations.forEach(a => {
+        batch.update(doc(db, 'sales_orders', a.id), { paymentStatus: a.status, paidAmount: a.newPaid });
+      });
+      await batch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'customers');
+    }
+  };
+
   // Receive purchase order & ingest merchandise/raw materials into stock
   const handleReceivePurchaseOrder = async (po: PurchaseOrder) => {
     try {
@@ -1464,6 +1507,61 @@ export default function App() {
         createdAt: new Date().toISOString()
       });
 
+      await batch.commit();
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'suppliers');
+    }
+  };
+
+  // Pago a proveedor con una o más formas de pago (cada una sale de su caja o cuenta), imputado a facturas
+  const handleRecordSupplierReceipt = async (
+    supplierId: string,
+    lines: PaymentLine[],
+    notes: string,
+    allocations: (DocAllocation & { kind: 'pi' | 'po' })[]
+  ) => {
+    const sup = suppliers.find(s => s.id === supplierId);
+    const valid = lines.filter(l => (Number(l.amount) || 0) > 0);
+    if (!valid.length) return;
+    try {
+      const batch = writeBatch(db);
+      const now = new Date().toISOString();
+      const opNumber = `OP-${Date.now().toString().slice(-6)}`;
+      valid.forEach((l, i) => {
+        const amount = Number(l.amount);
+        const box = cashboxes.find(b => b.id === l.cashboxId) || cashboxes[0];
+        if (box) batch.update(doc(db, 'cashboxes', box.id), { currentBalance: increment(-amount) });
+        const txId = `tx-sup-${Date.now()}-${i}`;
+        batch.set(doc(db, 'financial_transactions', txId), {
+          id: txId,
+          type: 'pago_proveedor',
+          direction: 'egreso',
+          amount,
+          date: now,
+          entityId: supplierId,
+          entityName: sup?.businessName || 'Proveedor',
+          paymentMethod: l.method,
+          concept: notes || `Pago a proveedor ${sup?.businessName || ''}`,
+          receiptNumber: opNumber,
+          notes: l.reference || ''
+        });
+        const movId = `mov-sup-${Date.now()}-${i}`;
+        batch.set(doc(db, 'cash_movements', movId), {
+          id: movId,
+          cashboxId: box?.id || 'box-planta',
+          cashboxName: box?.name || 'Caja',
+          type: 'egreso',
+          amount,
+          category: 'materias_primas',
+          concept: `Pago a proveedor: ${sup?.businessName || ''} (${l.method}${l.reference ? ` ${l.reference}` : ''}). ${notes}`,
+          date: now,
+          user: currentUser?.name || 'Finanzas',
+          createdAt: now
+        });
+      });
+      allocations.forEach(a => {
+        batch.update(doc(db, a.kind === 'pi' ? 'purchase_invoices' : 'purchase_orders', a.id), { paidAmount: a.newPaid, paymentStatus: a.status });
+      });
       await batch.commit();
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'suppliers');
@@ -2926,6 +3024,7 @@ export default function App() {
                 await setDoc(doc(db, 'customers', cust.id), cust);
               }}
               onRecordPayment={handleRecordCustomerPayment}
+              onRecordReceipt={handleRecordCustomerReceipt}
             />
           )}
 
@@ -2957,6 +3056,8 @@ export default function App() {
               }}
               onReceivePurchaseOrder={handleReceivePurchaseOrder}
               onRecordSupplierPayment={handleRecordSupplierPayment}
+              purchaseInvoices={purchaseInvoices}
+              onRecordSupplierReceipt={handleRecordSupplierReceipt}
             />
           )}
 

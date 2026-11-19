@@ -51,6 +51,7 @@ import {
   AppUser 
 } from '../types';
 import { brandName, brandLogo } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface SellersModuleProps {
   sellers: Seller[];
@@ -1320,8 +1321,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
                       Comisión por Venta (%)
                     </label>
                     <div className="relative">
-                      <input
-                        type="number"
+                      <NumInput
                         step="0.1"
                         min="0"
                         max="100"
@@ -1341,8 +1341,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
                       Comisión por Cobranza (%)
                     </label>
                     <div className="relative">
-                      <input
-                        type="number"
+                      <NumInput
                         step="0.1"
                         min="0"
                         max="100"
@@ -1721,8 +1720,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
                     <label className="block text-xs font-bold text-blue-900 mb-1">
                       Monto de Venta ($)
                     </label>
-                    <input
-                      type="number"
+                    <NumInput
                       min="0"
                       value={checkInSaleAmount}
                       onChange={e => setCheckInSaleAmount(Number(e.target.value))}
@@ -1733,8 +1731,7 @@ export const SellersModule: React.FC<SellersModuleProps> = ({
                     <label className="block text-xs font-bold text-blue-900 mb-1">
                       Monto Cobrado ($)
                     </label>
-                    <input
-                      type="number"
+                    <NumInput
                       min="0"
                       value={checkInCollectAmount}
                       onChange={e => setCheckInCollectAmount(Number(e.target.value))}

@@ -32,6 +32,7 @@ import {
   LoyaltyRaffle,
   CompanyConfig 
 } from '../types';
+import { NumInput } from './NumInput';
 
 interface LoyaltyModuleProps {
   customers: Customer[];
@@ -830,8 +831,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                               </option>
                             ))}
                         </select>
-                        <input
-                          type="number"
+                        <NumInput
                           min="1"
                           value={st.entries}
                           onChange={(e) => setEnrollState({ ...enrollState, [raffle.id]: { ...st, entries: Math.max(1, parseInt(e.target.value) || 1) } })}
@@ -953,8 +953,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                     Costo en Puntos:
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="1"
                     value={rewardForm.pointsCost}
                     onChange={(e) => setRewardForm({ ...rewardForm, pointsCost: parseInt(e.target.value) || 1 })}
@@ -967,8 +966,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                     Stock Disponible:
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="0"
                     value={rewardForm.stock}
                     onChange={(e) => setRewardForm({ ...rewardForm, stock: parseInt(e.target.value) || 0 })}
@@ -1000,8 +998,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                     Precio de Referencia ($):
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="0"
                     value={rewardForm.referencePriceArs}
                     onChange={(e) => setRewardForm({ ...rewardForm, referencePriceArs: parseFloat(e.target.value) || 0 })}
@@ -1086,8 +1083,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                 {adjustType === 'restar' && (
                   <p className="text-[11px] text-slate-500 mb-1">Saldo actual: {(showAdjustModal.loyaltyPoints || 0).toLocaleString('es-AR')} pts (no se puede dejar en negativo)</p>
                 )}
-                <input
-                  type="number"
+                <NumInput
                   min="1"
                   value={adjustPointsValue}
                   onChange={(e) => setAdjustPointsValue(parseInt(e.target.value) || 1)}
@@ -1269,8 +1265,7 @@ export const LoyaltyModule: React.FC<LoyaltyModuleProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">Pts por chance:</label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="1"
                     required
                     value={raffleForm.pointsPerEntry}

@@ -21,6 +21,7 @@ import {
   Landmark
 } from 'lucide-react';
 import { Cashbox, CashMovement, CashMovementCategory, CashboxType, CashRegisterSession } from '../types';
+import { NumInput } from './NumInput';
 
 interface CashboxModuleProps {
   cashboxes: Cashbox[];
@@ -658,8 +659,7 @@ export const CashboxModule: React.FC<CashboxModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                     Importe ($)
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="1"
                     step="0.01"
                     value={movementForm.amount || ''}
@@ -804,8 +804,7 @@ export const CashboxModule: React.FC<CashboxModuleProps> = ({
                 <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                   Monto a Transferir ($)
                 </label>
-                <input
-                  type="number"
+                <NumInput
                   min="1"
                   step="0.01"
                   value={transferForm.amount || ''}
@@ -922,8 +921,7 @@ export const CashboxModule: React.FC<CashboxModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                     Saldo Inicial ($)
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={cashboxForm.currentBalance}
                     onChange={e => setCashboxForm({ ...cashboxForm, currentBalance: Number(e.target.value) })}
                     className="w-full text-xs p-2 rounded-xl border border-slate-300 font-mono font-bold"
@@ -1029,8 +1027,7 @@ export const CashboxModule: React.FC<CashboxModuleProps> = ({
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                   Efectivo Físico Recontado en Billetes ($):
                 </label>
-                <input
-                  type="number"
+                <NumInput
                   min="0"
                   value={countedCash}
                   onChange={(e) => setCountedCash(parseFloat(e.target.value) || 0)}

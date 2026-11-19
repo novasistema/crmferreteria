@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { Transport, SalesOrder, Customer } from '../types';
+import { NumInput } from './NumInput';
 
 interface LogisticsModuleProps {
   transports: Transport[];
@@ -301,8 +302,7 @@ export const LogisticsModule: React.FC<LogisticsModuleProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Capacidad (kg)</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={transportForm.capacityKg}
                     onChange={e => setTransportForm({ ...transportForm, capacityKg: Number(e.target.value) })}
                     className="w-full text-xs p-2 rounded-xl border border-slate-300 font-mono"

@@ -12,6 +12,7 @@ import {
   ArrowDownRight 
 } from 'lucide-react';
 import { Product, StockAdjustmentRecord } from '../../types';
+import { NumInput } from '../NumInput';
 
 interface AjusteStockModuleProps {
   products: Product[];
@@ -349,8 +350,7 @@ export const AjusteStockModule: React.FC<AjusteStockModuleProps> = ({ products }
                                 <option value="subtract">➖ Restar</option>
                                 <option value="set">🎯 Fijar en</option>
                               </select>
-                              <input
-                                type="number"
+                              <NumInput
                                 min="0"
                                 value={item.amount}
                                 onChange={(e) => {

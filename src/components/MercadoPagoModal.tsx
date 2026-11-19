@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { QrCode, X, CheckCircle2, RotateCw, Copy, Check, ExternalLink, ShieldCheck, DollarSign } from 'lucide-react';
 import { Customer } from '../types';
+import { NumInput } from './NumInput';
 
 interface MercadoPagoModalProps {
   isOpen: boolean;
@@ -110,8 +111,7 @@ export const MercadoPagoModal: React.FC<MercadoPagoModalProps> = ({
                 <label className="block text-[11px] font-bold text-slate-500 uppercase">Monto a Cobrar (ARS):</label>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-slate-400 font-black text-lg">$</span>
-                  <input
-                    type="number"
+                  <NumInput
                     value={amount}
                     onChange={e => setAmount(Math.max(0, parseInt(e.target.value) || 0))}
                     className="w-full text-2xl font-mono font-black text-slate-900 bg-transparent focus:outline-none"

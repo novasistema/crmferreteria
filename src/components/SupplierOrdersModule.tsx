@@ -29,6 +29,7 @@ import { PurchaseOrder, PurchaseOrderItem, Product, Supplier, CompanyConfig } fr
 import { generatePurchaseOrderPDF, buildPurchaseOrderWhatsAppMessage } from '../utils/purchaseOrderPdfUtils';
 import * as XLSX from 'xlsx';
 import { brandName } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface SupplierOrdersModuleProps {
   purchaseOrders: PurchaseOrder[];
@@ -934,8 +935,7 @@ export const SupplierOrdersModule: React.FC<SupplierOrdersModuleProps> = ({
                         >
                           -
                         </button>
-                        <input
-                          type="number"
+                        <NumInput
                           min={1}
                           value={addQuantity}
                           onChange={e => setAddQuantity(Math.max(1, Number(e.target.value) || 1))}
@@ -955,8 +955,7 @@ export const SupplierOrdersModule: React.FC<SupplierOrdersModuleProps> = ({
                       <label className="block text-[11px] font-bold text-slate-700 mb-1">
                         Costo Unit. Ref. (ARS):
                       </label>
-                      <input
-                        type="number"
+                      <NumInput
                         step="0.01"
                         value={addUnitCost}
                         onChange={e => setAddUnitCost(Number(e.target.value) || 0)}
@@ -1061,8 +1060,7 @@ export const SupplierOrdersModule: React.FC<SupplierOrdersModuleProps> = ({
                             </div>
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono font-medium">
-                            <input
-                              type="number"
+                            <NumInput
                               value={item.unitCost}
                               onChange={e => handleUpdateItemCost(idx, Number(e.target.value) || 0)}
                               className="w-20 text-right p-1 text-xs border border-slate-200 rounded font-mono"

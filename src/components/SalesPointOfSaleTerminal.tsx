@@ -45,6 +45,7 @@ import {
 import { generateQuotePDF, generateRemitoPDF } from '../utils/quoteAndDeliveryPdfUtils';
 import { SalesCheckoutFlowModal, CheckoutResult } from './SalesCheckoutFlowModal';
 import { brandName } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface SalesPointOfSaleTerminalProps {
   products: Product[];
@@ -919,8 +920,7 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
                     >
                       -
                     </button>
-                    <input
-                      type="number"
+                    <NumInput
                       min="1"
                       value={item.quantity}
                       onChange={e => {
@@ -948,8 +948,7 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
 
                   {/* Precio Unitario (ARS) */}
                   <div className="col-span-2 text-right">
-                    <input
-                      type="number"
+                    <NumInput
                       value={item.unitPrice}
                       onChange={e => {
                         const val = Math.max(0, parseFloat(e.target.value) || 0);
@@ -961,8 +960,7 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
 
                   {/* Bonif % */}
                   <div className="col-span-1 text-center">
-                    <input
-                      type="number"
+                    <NumInput
                       min="0"
                       max="100"
                       value={item.discount}
@@ -1053,8 +1051,7 @@ export const SalesPointOfSaleTerminal: React.FC<SalesPointOfSaleTerminalProps> =
           {/* Campo de Bonificación / Recargo */}
           <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-xs">
             <span className="text-slate-400 font-semibold">% Bonif/Rec.:</span>
-            <input
-              type="number"
+            <NumInput
               min="-100"
               max="100"
               value={globalDiscountPct}

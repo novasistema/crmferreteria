@@ -20,6 +20,7 @@ import {
   Landmark
 } from 'lucide-react';
 import { CheckItem, CheckType, CheckStatus, Customer, Supplier, Cashbox } from '../types';
+import { NumInput } from './NumInput';
 
 interface ChecksModuleProps {
   checks: CheckItem[];
@@ -552,8 +553,7 @@ export const ChecksModule: React.FC<ChecksModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                     Importe ($)
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="1"
                     step="0.01"
                     placeholder="0.00"

@@ -23,6 +23,7 @@ import {
 import { Product, CompanyConfig, Formula, ProductionOrder } from '../types';
 import { exportPriceListToExcel, exportPriceListToPDF } from '../utils/exportUtils';
 import { brandName } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 // Standard packaging options with real packaging cost in ARS and volume/weight details
 export const PACKAGING_OPTIONS = [
@@ -830,8 +831,7 @@ export const PriceListModule: React.FC<PriceListModuleProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Stock Inicial</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={productForm.stock}
                     onChange={e => setProductForm({ ...productForm, stock: Number(e.target.value) })}
                     className="w-full text-xs p-2 rounded-xl border border-slate-300 font-mono font-bold"
@@ -849,8 +849,7 @@ export const PriceListModule: React.FC<PriceListModuleProps> = ({
                     <label className="block text-[11px] font-bold text-emerald-800 uppercase mb-1">
                       P. Pinturería / Distr. ($)
                     </label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={productForm.priceDistributor}
                       onChange={e => setProductForm({ ...productForm, priceDistributor: Number(e.target.value) })}
                       className="w-full text-xs p-2 rounded-xl border border-emerald-300 font-mono font-bold text-emerald-800 bg-white"
@@ -861,8 +860,7 @@ export const PriceListModule: React.FC<PriceListModuleProps> = ({
                     <label className="block text-[11px] font-bold text-blue-800 uppercase mb-1">
                       P. Mayorista ($)
                     </label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={productForm.priceWholesale}
                       onChange={e => setProductForm({ ...productForm, priceWholesale: Number(e.target.value) })}
                       className="w-full text-xs p-2 rounded-xl border border-blue-300 font-mono font-bold text-blue-800 bg-white"
@@ -873,8 +871,7 @@ export const PriceListModule: React.FC<PriceListModuleProps> = ({
                     <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                       P. Sugerido Público ($)
                     </label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={productForm.priceRetail}
                       onChange={e => setProductForm({ ...productForm, priceRetail: Number(e.target.value) })}
                       className="w-full text-xs p-2 rounded-xl border border-slate-300 font-mono text-slate-800 bg-white"
@@ -889,8 +886,7 @@ export const PriceListModule: React.FC<PriceListModuleProps> = ({
                   </div>
                   <div className="flex items-center gap-1 font-mono font-bold text-xs text-slate-800">
                     <span>$</span>
-                    <input
-                      type="number"
+                    <NumInput
                       value={productForm.unitCost}
                       onChange={e => setProductForm({ ...productForm, unitCost: Number(e.target.value) })}
                       className="w-24 p-1 rounded-lg border border-slate-300 text-right bg-white"
@@ -1039,8 +1035,7 @@ export const PriceListModule: React.FC<PriceListModuleProps> = ({
                   </span>
                 </div>
                 <div className="relative">
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.5"
                     value={bulkPercentage}
                     onChange={e => setBulkPercentage(Number(e.target.value))}

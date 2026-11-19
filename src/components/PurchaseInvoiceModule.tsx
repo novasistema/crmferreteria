@@ -28,6 +28,7 @@ import {
   PurchaseInvoiceType 
 } from '../types';
 import { ProductFormModal } from './ProductFormModal';
+import { NumInput } from './NumInput';
 
 interface PurchaseInvoiceModuleProps {
   products: Product[];
@@ -733,8 +734,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                     Precio Unit.
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={quickUnitPrice}
                     onChange={(e) => setQuickUnitPrice(Number(e.target.value) || 0)}
@@ -747,8 +747,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                     Cant.
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min={1}
                     value={quickQuantity}
                     onChange={(e) => setQuickQuantity(Math.max(1, Number(e.target.value) || 1))}
@@ -761,8 +760,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                     IVA %
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={quickIva}
                     onChange={(e) => setQuickIva(Number(e.target.value) || 0)}
                     className="w-full py-2 px-2 text-center rounded-xl border border-slate-300 text-xs font-bold bg-white focus:outline-none focus:border-blue-500"
@@ -774,8 +772,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                     Dto.1%
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={quickDto1}
                     onChange={(e) => setQuickDto1(Number(e.target.value) || 0)}
                     className="w-full py-2 px-2 text-center rounded-xl border border-slate-300 text-xs font-bold bg-white focus:outline-none focus:border-blue-500"
@@ -787,8 +784,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                     Dto.2%
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={quickDto2}
                     onChange={(e) => setQuickDto2(Number(e.target.value) || 0)}
                     className="w-full py-2 px-2 text-center rounded-xl border border-slate-300 text-xs font-bold bg-white focus:outline-none focus:border-blue-500"
@@ -800,8 +796,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
                     Dto.3%
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={quickDto3}
                     onChange={(e) => setQuickDto3(Number(e.target.value) || 0)}
                     className="w-full py-2 px-2 text-center rounded-xl border border-slate-300 text-xs font-bold bg-white focus:outline-none focus:border-blue-500"
@@ -833,8 +828,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
                       <label className="text-[10px] text-slate-500 font-bold uppercase block">Cantidad de Cajas</label>
-                      <input
-                        type="number"
+                      <NumInput
                         min={1}
                         value={boxQuantity}
                         onChange={(e) => setBoxQuantity(Number(e.target.value) || 1)}
@@ -844,8 +838,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                     <span className="text-slate-400 font-bold pt-4">x</span>
                     <div className="flex-1">
                       <label className="text-[10px] text-slate-500 font-bold uppercase block">Unidades por Caja</label>
-                      <input
-                        type="number"
+                      <NumInput
                         min={1}
                         value={conversionFactor}
                         onChange={(e) => setConversionFactor(Number(e.target.value) || 1)}
@@ -909,8 +902,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                             />
                           </td>
                           <td className="p-3 text-center">
-                            <input
-                              type="number"
+                            <NumInput
                               min={1}
                               value={item.quantity}
                               onChange={(e) => handleUpdateItem(idx, 'quantity', Number(e.target.value))}
@@ -918,8 +910,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                             />
                           </td>
                           <td className="p-3 text-right">
-                            <input
-                              type="number"
+                            <NumInput
                               step="0.01"
                               value={item.unitPrice}
                               onChange={(e) => handleUpdateItem(idx, 'unitPrice', Number(e.target.value))}
@@ -927,24 +918,21 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                             />
                           </td>
                           <td className="p-3 text-center">
-                            <input
-                              type="number"
+                            <NumInput
                               value={item.discount1}
                               onChange={(e) => handleUpdateItem(idx, 'discount1', Number(e.target.value))}
                               className="w-12 text-center p-1.5 rounded-lg border border-slate-300 text-xs"
                             />
                           </td>
                           <td className="p-3 text-center">
-                            <input
-                              type="number"
+                            <NumInput
                               value={item.discount2}
                               onChange={(e) => handleUpdateItem(idx, 'discount2', Number(e.target.value))}
                               className="w-12 text-center p-1.5 rounded-lg border border-slate-300 text-xs"
                             />
                           </td>
                           <td className="p-3 text-center">
-                            <input
-                              type="number"
+                            <NumInput
                               value={item.discount3}
                               onChange={(e) => handleUpdateItem(idx, 'discount3', Number(e.target.value))}
                               className="w-12 text-center p-1.5 rounded-lg border border-slate-300 text-xs"
@@ -1016,8 +1004,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
                     Impuesto Interno
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={internalTax}
                     onChange={(e) => setInternalTax(Number(e.target.value) || 0)}
@@ -1029,8 +1016,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
                     Otros Impuestos
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={otherTaxes}
                     onChange={(e) => setOtherTaxes(Number(e.target.value) || 0)}
@@ -1042,8 +1028,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
                     Percepción IIBB
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={iibbPerception}
                     onChange={(e) => setIibbPerception(Number(e.target.value) || 0)}
@@ -1055,8 +1040,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 mb-1">
                     Percepción IVA
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     step="0.01"
                     value={ivaPerception}
                     onChange={(e) => setIvaPerception(Number(e.target.value) || 0)}
@@ -1077,8 +1061,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
 
               <div className="flex items-center gap-2">
                 <label className="font-bold text-slate-600">Dto. %</label>
-                <input
-                  type="number"
+                <NumInput
                   min={0}
                   max={100}
                   value={globalDiscountPercent}
@@ -1089,8 +1072,7 @@ export const PurchaseInvoiceModule: React.FC<PurchaseInvoiceModuleProps> = ({
 
               <div className="flex items-center gap-2">
                 <label className="font-bold text-slate-600">Desc. Extra %</label>
-                <input
-                  type="number"
+                <NumInput
                   min={0}
                   max={100}
                   value={extraDiscountPercent}

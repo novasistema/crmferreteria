@@ -457,6 +457,7 @@ export interface PurchaseOrder {
   discountPercentage?: number;
   discountAmount?: number;
   total: number;
+  paidAmount?: number; // lo ya pagado de esta orden
   deliveryAddress?: string;
   notes?: string;
   whatsappMessage?: string;
@@ -475,7 +476,7 @@ export interface FinancialTransaction {
   date: string;
   entityId?: string;
   entityName?: string;
-  paymentMethod: 'efectivo' | 'transferencia' | 'cheque' | 'echeq';
+  paymentMethod: 'efectivo' | 'transferencia' | 'cheque' | 'echeq' | 'tarjeta' | 'mercadopago';
   concept: string;
   receiptNumber?: string;
 }
@@ -1363,6 +1364,8 @@ export interface PurchaseInvoice {
   ivaPerception: number;
   total: number;
   notes?: string;
+  paidAmount?: number; // lo ya pagado de esta factura
+  paymentStatus?: 'pendiente' | 'parcial' | 'pagado';
   createdAt: string;
   createdBy?: string;
 }

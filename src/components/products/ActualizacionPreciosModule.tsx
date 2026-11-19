@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import { Product, Supplier, PriceUpdateTemplate } from '../../types';
+import { NumInput } from '../NumInput';
 
 interface ActualizacionPreciosModuleProps {
   products: Product[];
@@ -763,8 +764,7 @@ export const ActualizacionPreciosModule: React.FC<ActualizacionPreciosModuleProp
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-bold text-slate-800 mb-1">Fila inicial</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={newStartRow}
                     onChange={(e) => setNewStartRow(parseInt(e.target.value) || 1)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg"

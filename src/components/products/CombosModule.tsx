@@ -15,6 +15,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import { Product, ComboPack, ComboProductItem } from '../../types';
+import { NumInput } from '../NumInput';
 
 interface CombosModuleProps {
   products: Product[];
@@ -467,8 +468,7 @@ export const CombosModule: React.FC<CombosModuleProps> = ({ products }) => {
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">% Ganancia</label>
                         <div className="relative">
-                          <input
-                            type="number"
+                          <NumInput
                             value={profitPercent}
                             onChange={(e) => setProfitPercent(Number(e.target.value))}
                             className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
@@ -479,8 +479,7 @@ export const CombosModule: React.FC<CombosModuleProps> = ({ products }) => {
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">% IVA</label>
                         <div className="relative">
-                          <input
-                            type="number"
+                          <NumInput
                             value={ivaPercent}
                             onChange={(e) => setIvaPercent(Number(e.target.value))}
                             className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
@@ -551,8 +550,7 @@ export const CombosModule: React.FC<CombosModuleProps> = ({ products }) => {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-500">Cant:</span>
-                            <input
-                              type="number"
+                            <NumInput
                               min="1"
                               value={item.quantity}
                               onChange={(e) => {

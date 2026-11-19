@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Customer, Supplier, PurchaseOrder, SalesOrder, CompanyConfig, Cashbox } from '../types';
 import { legalName, transferInfo } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface DebtsAndReceivablesModuleProps {
   customers: Customer[];
@@ -490,8 +491,7 @@ export const DebtsAndReceivablesModule: React.FC<DebtsAndReceivablesModuleProps>
             <div className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 uppercase mb-1">Monto a Abonar ($):</label>
-                <input
-                  type="number"
+                <NumInput
                   value={payAmount}
                   onChange={e => setPayAmount(Number(e.target.value))}
                   className="w-full text-base p-2.5 rounded-xl border border-red-300 font-mono font-black text-red-700"

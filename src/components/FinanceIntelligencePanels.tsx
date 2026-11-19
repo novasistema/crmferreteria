@@ -5,6 +5,7 @@ import {
   monthlyStats, averageMargin, employeeCost, monthlyFixedCosts, breakEven, averageGrowth, projectSales, savingsStatus, round2, addMonths
 } from '../services/financeIntelligence';
 import { todayIso } from '../services/financePlanning';
+import { NumInput, parseArNumber } from './NumInput';
 
 const money = (n: number) => (isFinite(n) ? `$ ${(Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—');
 const pct = (n: number) => `${(Number(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
@@ -18,7 +19,7 @@ const NumberField: React.FC<{ label: string; value: number; onChange: (n: number
   <label className="block">
     <span className="text-xs font-bold text-slate-600">{label}</span>
     <div className="relative">
-      <input type="number" step={step || 'any'} disabled={disabled} value={Number.isFinite(value) ? value : 0} onChange={e => onChange(Number(e.target.value))} className={`${inputCls} ${suffix ? 'pr-10' : ''} disabled:bg-slate-50`} />
+      <NumInput step={step || 'any'} disabled={disabled} value={Number.isFinite(value) ? value : 0} onChange={e => onChange(Number(e.target.value))} className={`${inputCls} ${suffix ? 'pr-10' : ''} disabled:bg-slate-50`} />
       {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-xs text-slate-400">{suffix}</span>}
     </div>
   </label>
@@ -255,7 +256,7 @@ export const ReservesPanel: React.FC<Common & {
                   {canEdit && st.pct < 1 && (
                     <div className="flex gap-2 mt-2">
                       <input value={contrib[p.id] || ''} onChange={e => setContrib({ ...contrib, [p.id]: e.target.value })} inputMode="decimal" placeholder="Aporte" className="flex-1 border border-slate-300 rounded-xl px-3 py-1.5 text-sm" />
-                      <button onClick={async () => { const n = Number(String(contrib[p.id] || '').replace(/\./g, '').replace(',', '.')); if (!(n > 0)) return; await props.onSavePlan({ ...p, contributions: [...p.contributions, { date: today, amount: round2(n) }] }); setContrib({ ...contrib, [p.id]: '' }); }} className="px-3 py-1.5 rounded-xl bg-teal-600 text-white text-xs font-bold">Registrar aporte</button>
+                      <button onClick={async () => { const n = (parseArNumber(String(contrib[p.id] || '')) ?? NaN); if (!(n > 0)) return; await props.onSavePlan({ ...p, contributions: [...p.contributions, { date: today, amount: round2(n) }] }); setContrib({ ...contrib, [p.id]: '' }); }} className="px-3 py-1.5 rounded-xl bg-teal-600 text-white text-xs font-bold">Registrar aporte</button>
                     </div>
                   )}
                 </div>

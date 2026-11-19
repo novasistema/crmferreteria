@@ -53,6 +53,7 @@ import {
   DueItem
 } from '../services/financePlanning';
 import { computeTaxHistory, withTaxDefaults, addMonths, periodLabel } from '../services/taxEngine';
+import { NumInput } from './NumInput';
 
 const CATEGORY_OPTIONS: { value: CashMovementCategory; label: string }[] = [
   { value: 'alquiler_planta', label: 'Alquiler' },
@@ -127,7 +128,7 @@ const PayModal: React.FC<{
           <div><h3 className="font-black text-slate-900">{title}</h3><p className="text-xs text-slate-500">{subtitle}</p></div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100"><X className="w-4 h-4" /></button>
         </div>
-        <label className="block"><span className="text-xs font-bold text-slate-600">Importe</span><input type="number" step="0.01" value={value} onChange={e => setValue(Number(e.target.value))} className={`${inputCls} font-mono`} /></label>
+        <label className="block"><span className="text-xs font-bold text-slate-600">Importe</span><NumInput step="0.01" value={value} onChange={e => setValue(Number(e.target.value))} className={`${inputCls} font-mono`} /></label>
         <label className="block"><span className="text-xs font-bold text-slate-600">Sale de</span>
           <select value={box} onChange={e => setBox(e.target.value)} className={inputCls}>
             {ars.length === 0 && <option value="">No hay cajas en pesos</option>}
@@ -410,7 +411,7 @@ const ExpensesPanel: React.FC<Props & { canEdit: boolean; onPay: (e: FixedExpens
             <label className="block"><span className="text-xs font-bold text-slate-600">Nombre</span><input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="Ej: Alquiler local, Luz EPEC, Contador" className={inputCls} /></label>
             <label className="block"><span className="text-xs font-bold text-slate-600">Proveedor / a quién se paga</span><input value={editing.provider || ''} onChange={e => setEditing({ ...editing, provider: e.target.value })} className={inputCls} /></label>
             <div className="grid grid-cols-2 gap-2">
-              <label className="block"><span className="text-xs font-bold text-slate-600">Importe</span><input type="number" step="0.01" value={editing.amount || ''} onChange={e => setEditing({ ...editing, amount: Number(e.target.value) })} className={`${inputCls} font-mono`} /></label>
+              <label className="block"><span className="text-xs font-bold text-slate-600">Importe</span><NumInput step="0.01" value={editing.amount || ''} onChange={e => setEditing({ ...editing, amount: Number(e.target.value) })} className={`${inputCls} font-mono`} /></label>
               <label className="block"><span className="text-xs font-bold text-slate-600">Frecuencia</span>
                 <select value={editing.frequency} onChange={e => setEditing({ ...editing, frequency: e.target.value as ExpenseFrequency, dueDay: e.target.value === 'semanal' ? 1 : editing.dueDay > 7 ? editing.dueDay : 10 })} className={inputCls}>
                   {Object.entries(FREQ_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -422,7 +423,7 @@ const ExpensesPanel: React.FC<Props & { canEdit: boolean; onPay: (e: FixedExpens
                 {editing.frequency === 'semanal' ? (
                   <select value={editing.dueDay} onChange={e => setEditing({ ...editing, dueDay: Number(e.target.value) })} className={inputCls}>{WEEKDAYS.slice(1).map((d, i) => <option key={d} value={i + 1}>{d}</option>)}</select>
                 ) : (
-                  <input type="number" min={1} max={31} value={editing.dueDay} onChange={e => setEditing({ ...editing, dueDay: Number(e.target.value) })} className={inputCls} />
+                  <NumInput min={1} max={31} value={editing.dueDay} onChange={e => setEditing({ ...editing, dueDay: Number(e.target.value) })} className={inputCls} />
                 )}
               </label>
               <label className="block"><span className="text-xs font-bold text-slate-600">Desde</span><input type="date" value={editing.startDate} onChange={e => setEditing({ ...editing, startDate: e.target.value })} className={inputCls} /></label>
@@ -500,14 +501,14 @@ const LoansPanel: React.FC<Props & { canEdit: boolean; onPay: (l: Loan, number: 
             <label className="block md:col-span-2"><span className="text-xs font-bold text-slate-600">Quién presta</span><input value={f.lender} onChange={e => setF({ ...f, lender: e.target.value })} placeholder="Ej: Banco de Córdoba" className={inputCls} /></label>
             <label className="block"><span className="text-xs font-bold text-slate-600">Tipo</span><select value={f.kind} onChange={e => setF({ ...f, kind: e.target.value as LoanKind })} className={inputCls}>{Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
             <label className="block"><span className="text-xs font-bold text-slate-600">Moneda</span><select value={f.currency} onChange={e => setF({ ...f, currency: e.target.value as any })} className={inputCls}><option value="ARS">Pesos</option><option value="USD">Dólares</option></select></label>
-            <label className="block"><span className="text-xs font-bold text-slate-600">Capital recibido</span><input type="number" value={f.principal || ''} onChange={e => setF({ ...f, principal: Number(e.target.value) })} className={`${inputCls} font-mono`} /></label>
-            <label className="block"><span className="text-xs font-bold text-slate-600">Cuotas</span><input type="number" min={1} max={240} value={f.count} onChange={e => setF({ ...f, count: Number(e.target.value) })} className={inputCls} /></label>
+            <label className="block"><span className="text-xs font-bold text-slate-600">Capital recibido</span><NumInput value={f.principal || ''} onChange={e => setF({ ...f, principal: Number(e.target.value) })} className={`${inputCls} font-mono`} /></label>
+            <label className="block"><span className="text-xs font-bold text-slate-600">Cuotas</span><NumInput min={1} max={240} value={f.count} onChange={e => setF({ ...f, count: Number(e.target.value) })} className={inputCls} /></label>
             <label className="block"><span className="text-xs font-bold text-slate-600">Primer vencimiento</span><input type="date" value={f.firstDueDate} onChange={e => setF({ ...f, firstDueDate: e.target.value })} className={inputCls} /></label>
             <label className="block"><span className="text-xs font-bold text-slate-600">Sistema</span><select value={f.system} onChange={e => setF({ ...f, system: e.target.value as any })} className={inputCls}><option value="frances">Francés (con tasa)</option><option value="cuota_fija">Cuota fija conocida</option></select></label>
             {f.system === 'frances' ? (
-              <label className="block"><span className="text-xs font-bold text-slate-600">Tasa nominal anual (TNA %)</span><input type="number" step="0.01" value={f.annualRate || ''} onChange={e => setF({ ...f, annualRate: Number(e.target.value) })} className={inputCls} /></label>
+              <label className="block"><span className="text-xs font-bold text-slate-600">Tasa nominal anual (TNA %)</span><NumInput step="0.01" value={f.annualRate || ''} onChange={e => setF({ ...f, annualRate: Number(e.target.value) })} className={inputCls} /></label>
             ) : (
-              <label className="block"><span className="text-xs font-bold text-slate-600">Importe de cada cuota</span><input type="number" step="0.01" value={f.fixedAmount || ''} onChange={e => setF({ ...f, fixedAmount: Number(e.target.value) })} className={`${inputCls} font-mono`} /></label>
+              <label className="block"><span className="text-xs font-bold text-slate-600">Importe de cada cuota</span><NumInput step="0.01" value={f.fixedAmount || ''} onChange={e => setF({ ...f, fixedAmount: Number(e.target.value) })} className={`${inputCls} font-mono`} /></label>
             )}
             <label className="block md:col-span-2"><span className="text-xs font-bold text-slate-600">Se paga desde</span><select value={f.defaultCashboxId} onChange={e => setF({ ...f, defaultCashboxId: e.target.value })} className={inputCls}><option value="">Elegir al pagar</option>{cashboxes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             <label className="block md:col-span-2"><span className="text-xs font-bold text-slate-600">Notas</span><input value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} className={inputCls} /></label>

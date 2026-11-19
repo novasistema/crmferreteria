@@ -10,6 +10,7 @@ import {
   Tag
 } from 'lucide-react';
 import { Product } from '../../types';
+import { NumInput } from '../NumInput';
 
 interface ModificacionMasivaModuleProps {
   products: Product[];
@@ -336,7 +337,7 @@ export const ModificacionMasivaModule: React.FC<ModificacionMasivaModuleProps> =
               <input type="checkbox" checked={enableProfit} onChange={(e) => setEnableProfit(e.target.checked)} className="rounded text-blue-600" />
               <span>% Ganancia</span>
             </label>
-            <input disabled={!enableProfit} type="number" value={valProfit} onChange={(e) => setValProfit(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
+            <NumInput disabled={!enableProfit} value={valProfit} onChange={(e) => setValProfit(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
           </div>
 
           {/* % Gan. Mayorista */}
@@ -345,7 +346,7 @@ export const ModificacionMasivaModule: React.FC<ModificacionMasivaModuleProps> =
               <input type="checkbox" checked={enableProfitWholesale} onChange={(e) => setEnableProfitWholesale(e.target.checked)} className="rounded text-blue-600" />
               <span>% Gan. Mayorista</span>
             </label>
-            <input disabled={!enableProfitWholesale} type="number" value={valProfitWholesale} onChange={(e) => setValProfitWholesale(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
+            <NumInput disabled={!enableProfitWholesale} value={valProfitWholesale} onChange={(e) => setValProfitWholesale(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
           </div>
 
           {/* Punto Pedido */}
@@ -354,7 +355,7 @@ export const ModificacionMasivaModule: React.FC<ModificacionMasivaModuleProps> =
               <input type="checkbox" checked={enableReorderPoint} onChange={(e) => setEnableReorderPoint(e.target.checked)} className="rounded text-blue-600" />
               <span>Punto Pedido</span>
             </label>
-            <input disabled={!enableReorderPoint} type="number" value={valReorderPoint} onChange={(e) => setValReorderPoint(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
+            <NumInput disabled={!enableReorderPoint} value={valReorderPoint} onChange={(e) => setValReorderPoint(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
           </div>
 
           {/* Stock Mínimo */}
@@ -363,7 +364,7 @@ export const ModificacionMasivaModule: React.FC<ModificacionMasivaModuleProps> =
               <input type="checkbox" checked={enableMinStock} onChange={(e) => setEnableMinStock(e.target.checked)} className="rounded text-blue-600" />
               <span>Stock Mínimo</span>
             </label>
-            <input disabled={!enableMinStock} type="number" value={valMinStock} onChange={(e) => setValMinStock(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
+            <NumInput disabled={!enableMinStock} value={valMinStock} onChange={(e) => setValMinStock(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
           </div>
 
           {/* Stock Máximo */}
@@ -372,7 +373,7 @@ export const ModificacionMasivaModule: React.FC<ModificacionMasivaModuleProps> =
               <input type="checkbox" checked={enableMaxStock} onChange={(e) => setEnableMaxStock(e.target.checked)} className="rounded text-blue-600" />
               <span>Stock Máximo</span>
             </label>
-            <input disabled={!enableMaxStock} type="number" value={valMaxStock} onChange={(e) => setValMaxStock(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
+            <NumInput disabled={!enableMaxStock} value={valMaxStock} onChange={(e) => setValMaxStock(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
           </div>
 
           {/* Cant. por Bulto */}
@@ -381,7 +382,7 @@ export const ModificacionMasivaModule: React.FC<ModificacionMasivaModuleProps> =
               <input type="checkbox" checked={enablePackageQty} onChange={(e) => setEnablePackageQty(e.target.checked)} className="rounded text-blue-600" />
               <span>Cant. por Bulto</span>
             </label>
-            <input disabled={!enablePackageQty} type="number" value={valPackageQty} onChange={(e) => setValPackageQty(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
+            <NumInput disabled={!enablePackageQty} value={valPackageQty} onChange={(e) => setValPackageQty(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
           </div>
 
           {/* Cant. x Venta */}
@@ -390,7 +391,7 @@ export const ModificacionMasivaModule: React.FC<ModificacionMasivaModuleProps> =
               <input type="checkbox" checked={enableSalesQty} onChange={(e) => setEnableSalesQty(e.target.checked)} className="rounded text-blue-600" />
               <span>Cant. x Venta</span>
             </label>
-            <input disabled={!enableSalesQty} type="number" value={valSalesQty} onChange={(e) => setValSalesQty(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
+            <NumInput disabled={!enableSalesQty} value={valSalesQty} onChange={(e) => setValSalesQty(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs bg-white disabled:bg-slate-50 disabled:text-slate-400" />
           </div>
 
           {/* Estado */}

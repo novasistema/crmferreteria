@@ -40,6 +40,7 @@ import {
   BackupPackage 
 } from '../services/backupAndResetService';
 import { brandName, legalName, brandLogo, DEFAULT_LOGO } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface SettingsModuleProps {
   config: CompanyConfig | null;
@@ -572,8 +573,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Punto de Venta Habilitado (P.V.)</label>
-                <input
-                  type="number"
+                <NumInput
                   value={formData.arcaPointOfSale}
                   onChange={e => setFormData({ ...formData, arcaPointOfSale: Number(e.target.value) })}
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-mono font-bold"

@@ -32,6 +32,7 @@ import {
   Cashbox 
 } from '../types';
 import { legalName } from '../utils/brand';
+import { NumInput } from './NumInput';
 
 interface InternalInstallmentsModuleProps {
   plans: InternalInstallmentPlan[];
@@ -729,8 +730,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
                     </select>
                   </div>
                   <div className="sm:col-span-2">
-                    <input
-                      type="number"
+                    <NumInput
                       min="1"
                       placeholder="Cant"
                       value={addProductQty}
@@ -739,8 +739,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
                     />
                   </div>
                   <div className="sm:col-span-3">
-                    <input
-                      type="number"
+                    <NumInput
                       placeholder="P. Unitario ($)"
                       value={addProductCustomPrice}
                       onChange={(e) => setAddProductCustomPrice(parseFloat(e.target.value) || 0)}
@@ -801,8 +800,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
                   <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                     Anticipo / Entrega Inicial ($):
                   </label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="0"
                     value={downPayment}
                     onChange={(e) => setDownPayment(parseFloat(e.target.value) || 0)}
@@ -951,8 +949,7 @@ export const InternalInstallmentsModule: React.FC<InternalInstallmentsModuleProp
                 <label className="block text-xs font-semibold text-slate-300 uppercase mb-1">
                   Importe a Cobrar ($):
                 </label>
-                <input
-                  type="number"
+                <NumInput
                   value={payFeeAmount}
                   onChange={(e) => setPayFeeAmount(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono font-bold"

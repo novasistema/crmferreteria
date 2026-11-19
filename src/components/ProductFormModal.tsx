@@ -19,6 +19,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { Product, ProductWarehouseStock, Supplier } from '../types';
+import { NumInput } from './NumInput';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -763,8 +764,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Costo de lista (s/IVA)</label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="0"
                     value={costListWithoutIva}
                     onChange={e => setCostListWithoutIva(parseFloat(e.target.value) || 0)}
@@ -774,8 +774,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Cant. x bulto</label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="1"
                     value={qtyPerPackage}
                     onChange={e => setQtyPerPackage(parseInt(e.target.value) || 1)}
@@ -785,8 +784,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Cant. envasado</label>
-                  <input
-                    type="number"
+                  <NumInput
                     min="1"
                     value={qtyPackaging}
                     onChange={e => setQtyPackaging(parseInt(e.target.value) || 1)}
@@ -810,8 +808,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <span className="text-[11px] text-slate-500 font-semibold block">Desc. 1 (%)</span>
-                    <input
-                      type="number"
+                    <NumInput
                       min="0"
                       max="100"
                       value={disc1}
@@ -821,8 +818,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 font-semibold block">Desc. 2 (%)</span>
-                    <input
-                      type="number"
+                    <NumInput
                       min="0"
                       max="100"
                       value={disc2}
@@ -832,8 +828,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 font-semibold block">Desc. 3 (%)</span>
-                    <input
-                      type="number"
+                    <NumInput
                       min="0"
                       max="100"
                       value={disc3}
@@ -843,8 +838,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 font-semibold block">Desc. 4 (%)</span>
-                    <input
-                      type="number"
+                    <NumInput
                       min="0"
                       max="100"
                       value={disc4}
@@ -863,8 +857,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">% Ganancia Contado</label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={profitMarginContado}
                       onChange={e => setProfitMarginContado(parseFloat(e.target.value) || 0)}
                       className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold bg-white"
@@ -878,8 +871,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <label className="block font-bold text-amber-900 mb-1">Precio Final (c/IVA)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={priceContadoWithIva}
                       onChange={e => setPriceContadoWithIva(parseFloat(e.target.value) || 0)}
                       className="w-full p-2 border border-amber-400 rounded-lg font-mono font-black text-amber-950 bg-white text-sm"
@@ -896,8 +888,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">% Ganancia Mayorista</label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={profitMarginWholesale}
                       onChange={e => setProfitMarginWholesale(parseFloat(e.target.value) || 0)}
                       className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold bg-white"
@@ -905,8 +896,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Comisión vendedor (%)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={sellerCommissionPercent}
                       onChange={e => setSellerCommissionPercent(parseFloat(e.target.value) || 0)}
                       className="w-full p-2 border border-slate-300 rounded-lg font-mono bg-white"
@@ -914,8 +904,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <label className="block font-bold text-blue-900 mb-1">Precio Mayorista (c/IVA)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={priceWholesaleWithIva}
                       onChange={e => setPriceWholesaleWithIva(parseFloat(e.target.value) || 0)}
                       className="w-full p-2 border border-blue-400 rounded-lg font-mono font-black text-blue-950 bg-white text-sm"
@@ -958,8 +947,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Stock actual</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={currentStock}
                     onChange={e => setCurrentStock(parseInt(e.target.value) || 0)}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-900"
@@ -968,8 +956,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-amber-700 mb-1">Mínimo de alerta</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={minAlertStock}
                     onChange={e => setMinAlertStock(parseInt(e.target.value) || 0)}
                     className="w-full text-xs p-2.5 rounded-xl border border-amber-300 font-mono font-bold bg-amber-50/50"
@@ -978,8 +965,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-blue-700 mb-1">Punto de pedido</label>
-                  <input
-                    type="number"
+                  <NumInput
                     value={reorderPoint}
                     onChange={e => setReorderPoint(parseInt(e.target.value) || 0)}
                     className="w-full text-xs p-2.5 rounded-xl border border-blue-300 font-mono font-bold bg-blue-50/50"
@@ -1044,8 +1030,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             <option>Sumar (+)</option>
                             <option>Restar (-)</option>
                           </select>
-                          <input
-                            type="number"
+                          <NumInput
                             placeholder="Cant."
                             className="w-16 p-1 border border-slate-300 rounded text-center text-xs font-mono font-bold"
                             onBlur={e => {
@@ -1110,8 +1095,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Cantidad contenida por envase</label>
-                    <input
-                      type="number"
+                    <NumInput
                       min="1"
                       value={fractionQuantity}
                       onChange={e => setFractionQuantity(parseInt(e.target.value) || 1)}
@@ -1120,8 +1104,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Precio sugerido por fracción ($)</label>
-                    <input
-                      type="number"
+                    <NumInput
                       value={fractionPrice}
                       onChange={e => setFractionPrice(parseFloat(e.target.value) || 0)}
                       className="w-full p-2 border border-slate-300 rounded-xl font-mono font-bold"
@@ -1177,8 +1160,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div>
                       <label className="block text-[11px] text-slate-600 mb-1">Mínimo de unidades mayorista</label>
-                      <input
-                        type="number"
+                      <NumInput
                         min="1"
                         value={wholesaleMinUnits}
                         onChange={e => setWholesaleMinUnits(parseInt(e.target.value) || 1)}
@@ -1187,8 +1169,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-[11px] text-slate-600 mb-1">Múltiplo de bulto mayorista</label>
-                      <input
-                        type="number"
+                      <NumInput
                         min="1"
                         value={wholesalePackageMultiple}
                         onChange={e => setWholesalePackageMultiple(parseInt(e.target.value) || 1)}

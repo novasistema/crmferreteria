@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Product, Supplier, PurchaseOrderItem } from '../types';
 import { ProductFormModal } from './ProductFormModal';
+import { NumInput } from './NumInput';
 
 interface InventoryModuleProps {
   products: Product[];
@@ -1325,8 +1326,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                   >
                     -
                   </button>
-                  <input
-                    type="number"
+                  <NumInput
                     min={1}
                     value={orderModalQuantity}
                     onChange={e => setOrderModalQuantity(Math.max(1, Number(e.target.value) || 1))}
@@ -1346,8 +1346,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Costo Unit. Ref. (ARS)
                 </label>
-                <input
-                  type="number"
+                <NumInput
                   step="0.01"
                   value={orderModalCost}
                   onChange={e => setOrderModalCost(Number(e.target.value) || 0)}

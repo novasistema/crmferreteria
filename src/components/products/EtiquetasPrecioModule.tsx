@@ -11,6 +11,7 @@ import {
   Copy 
 } from 'lucide-react';
 import { Product } from '../../types';
+import { NumInput } from '../NumInput';
 
 interface EtiquetasPrecioModuleProps {
   products: Product[];
@@ -251,8 +252,7 @@ export const EtiquetasPrecioModule: React.FC<EtiquetasPrecioModuleProps> = ({ pr
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-500">Copias:</span>
-                      <input
-                        type="number"
+                      <NumInput
                         min="1"
                         value={item.copies}
                         onChange={(e) => {

@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { FinancialTransaction, Customer, Supplier } from '../types';
+import { NumInput } from './NumInput';
 
 interface FinancesModuleProps {
   transactions: FinancialTransaction[];
@@ -287,8 +288,7 @@ export const FinancesModule: React.FC<FinancesModuleProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Monto ($)</label>
-                <input
-                  type="number"
+                <NumInput
                   min="1"
                   value={txForm.amount}
                   onChange={e => setTxForm({ ...txForm, amount: Number(e.target.value) })}
