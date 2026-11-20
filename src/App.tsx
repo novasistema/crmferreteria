@@ -2332,7 +2332,9 @@ export default function App() {
   };
 
   // --- ACCESO DE DEMOSTRACIÓN (usuario DEMO / DEMO) ---
-  const demoAccessEnabled = companyConfig?.demoAccessEnabled === true;
+  // En el sitio de demostración el acceso DEMO viene activado; en los sistemas de los clientes, apagado.
+  const isDemoSite = typeof window !== 'undefined' && window.location.hostname === 'crmferreteria-seven.vercel.app';
+  const demoAccessEnabled = !!companyConfig && (companyConfig.demoAccessEnabled ?? isDemoSite) === true;
   setArcaDemoSession(!!currentUser?.isDemo);
   useEffect(() => {
     // Con la demo activada, el usuario DEMO tiene que existir y estar activo
