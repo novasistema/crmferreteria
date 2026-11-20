@@ -23,16 +23,16 @@ const FULL: ModuleKey[] = [...MEDIO, 'financial_planning', 'profitability', 'tax
 export interface PlanMeta {
   id: SubscriptionPlanId;
   label: string;
-  price: number; // mensual sugerido, más IVA
+  price: number; // suscripción mensual, más IVA
   maxUsers: number | null; // null = sin límite
   modules: ModuleKey[];
   desc: string;
 }
 
 export const PLANS: PlanMeta[] = [
-  { id: 'basico', label: 'Básico', price: 69000, maxUsers: 3, modules: BASICO, desc: 'Un local: ventas, stock, compras, cuentas corrientes, caja y ARCA' },
-  { id: 'medio', label: 'Medio', price: 119000, maxUsers: 8, modules: MEDIO, desc: 'Suma móvil, portal de clientes, fidelización, cheques, cuotas y vendedores' },
-  { id: 'full', label: 'Full', price: 179000, maxUsers: null, modules: FULL, desc: 'Todo: finanzas, contador interno, sueldos, logística y asistente IA' }
+  { id: 'basico', label: 'Básico', price: 35000, maxUsers: 3, modules: BASICO, desc: 'Un local: ventas, stock, compras, cuentas corrientes, caja y ARCA' },
+  { id: 'medio', label: 'Medio', price: 70000, maxUsers: 8, modules: MEDIO, desc: 'Suma móvil, portal de clientes, fidelización, cheques, cuotas y vendedores' },
+  { id: 'full', label: 'Full', price: 130000, maxUsers: null, modules: FULL, desc: 'Todo: finanzas, contador interno, sueldos, logística y asistente IA' }
 ];
 
 export const PROFILE_MODULES: Record<BusinessProfileId, ModuleKey[]> = {
